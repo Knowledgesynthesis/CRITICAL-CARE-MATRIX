@@ -1,25 +1,159 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useSimulationStore } from '@/store/useSimulationStore';
 import { caseScenarios } from '@/data/case-scenarios';
-import { BookOpen, Play, RotateCcw } from 'lucide-react';
+import { formatNumber } from '@/lib/utils';
+import { BookOpen, Play, RotateCcw, CheckCircle, Circle, Target } from 'lucide-react';
+
+interface CaseGoal {
+  id: string;
+  description: string;
+  completed: boolean;
+  checkCriteria: (state: any) => boolean;
+}
 
 export function CaseEngine() {
-  const { setPatientState, resetSimulation } = useSimulationStore();
+  const { patientState, setPatientState, resetSimulation, interventions } = useSimulationStore();
   const [selectedCase, setSelectedCase] = useState<string | null>(null);
+  const [caseGoals, setCaseGoals] = useState<CaseGoal[]>([]);
+
+  const generateGoalsForCase = (caseId: string): CaseGoal[] => {
+    switch (caseId) {
+      case 'septic-shock':
+        return [
+          {
+            id: 'map-target',
+            description: 'Achieve MAP ≥ 65 mmHg',
+            completed: false,
+            checkCriteria: (state) => state.vitals.meanArterialPressure >= 65,
+          },
+          {
+            id: 'lactate-clear',
+            description: 'Reduce lactate to < 2 mmol/L',
+            completed: false,
+            checkCriteria: (state) => state.abg.lactate < 2,
+          },
+          {
+            id: 'fluid-resus',
+            description: 'Administer fluid resuscitation',
+            completed: false,
+            checkCriteria: () => interventions.some((i) => i.type === 'Fluid'),
+          },
+          {
+            id: 'vasopressor',
+            description: 'Start vasopressor if needed',
+            completed: false,
+            checkCriteria: () =>
+              interventions.some((i) => i.type === 'Medication' && i.description.includes('epinephrine')),
+          },
+        ];
+      case 'ards':
+        return [
+          {
+            id: 'low-tv',
+            description: 'Implement lung-protective ventilation (TV 6 mL/kg)',
+            completed: false,
+            checkCriteria: (state) => state.ventilator.tidalVolume <= 400,
+          },
+          {
+            id: 'adequate-peep',
+            description: 'Optimize PEEP (8-15 cmH₂O)',
+            completed: false,
+            checkCriteria: (state) => state.ventilator.peep >= 8 && state.ventilator.peep <= 15,
+          },
+          {
+            id: 'improve-pao2',
+            description: 'Improve oxygenation (PaO₂ > 60 mmHg)',
+            completed: false,
+            checkCriteria: (state) => state.abg.paO2 > 60,
+          },
+        ];
+      case 'metabolic-acidosis':
+        return [
+          {
+            id: 'identify-ag',
+            description: 'Calculate anion gap',
+            completed: false,
+            checkCriteria: () => interventions.length > 0,
+          },
+          {
+            id: 'winters-check',
+            description: 'Apply Winter\'s formula to check compensation',
+            completed: false,
+            checkCriteria: (state) => state.abg.paCO2 < 40,
+          },
+          {
+            id: 'normalize-ph',
+            description: 'Address underlying cause and normalize pH',
+            completed: false,
+            checkCriteria: (state) => state.abg.pH >= 7.35,
+          },
+        ];
+      case 'cardiogenic-shock':
+        return [
+          {
+            id: 'increase-co',
+            description: 'Improve cardiac output (CO > 4 L/min)',
+            completed: false,
+            checkCriteria: (state) => state.vitals.cardiacOutput > 4,
+          },
+          {
+            id: 'inotrope',
+            description: 'Start inotropic support',
+            completed: false,
+            checkCriteria: () =>
+              interventions.some((i) => i.type === 'Medication' && i.description.includes('butamine')),
+          },
+          {
+            id: 'manage-volume',
+            description: 'Optimize volume status (avoid overload)',
+            completed: false,
+            checkCriteria: (state) => state.vitals.centralVenousPressure <= 12,
+          },
+        ];
+      default:
+        return [
+          {
+            id: 'assess',
+            description: 'Assess patient parameters',
+            completed: false,
+            checkCriteria: () => true,
+          },
+          {
+            id: 'intervene',
+            description: 'Make at least one intervention',
+            completed: false,
+            checkCriteria: () => interventions.length > 0,
+          },
+        ];
+    }
+  };
+
+  // Update goal completion status whenever patient state or interventions change
+  useEffect(() => {
+    if (selectedCase && caseGoals.length > 0) {
+      const updatedGoals = caseGoals.map((goal) => ({
+        ...goal,
+        completed: goal.checkCriteria(patientState),
+      }));
+      setCaseGoals(updatedGoals);
+    }
+  }, [patientState, interventions, selectedCase]);
 
   const handleLoadCase = (caseId: string) => {
     const scenario = caseScenarios.find((c) => c.id === caseId);
     if (scenario) {
       setPatientState(scenario.initialState);
       setSelectedCase(caseId);
+      setCaseGoals(generateGoalsForCase(caseId));
     }
   };
 
   const handleReset = () => {
     resetSimulation();
     setSelectedCase(null);
+    setCaseGoals([]);
   };
 
   const currentCase = caseScenarios.find((c) => c.id === selectedCase);
@@ -93,6 +227,124 @@ export function CaseEngine() {
                   Lab, Ventilation Lab, etc.) to assess the patient and make interventions. Return to the ICU
                   Matrix Dashboard to see how all systems interact.
                 </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {currentCase && caseGoals.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="w-5 h-5" />
+              Case Goals & Progress
+            </CardTitle>
+            <CardDescription>
+              Complete these objectives to master the case scenario
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {caseGoals.map((goal) => (
+                <div
+                  key={goal.id}
+                  className={`flex items-start gap-3 p-3 rounded-lg border ${
+                    goal.completed
+                      ? 'bg-green-500/10 border-green-500/20'
+                      : 'bg-muted/50 border-border'
+                  }`}
+                >
+                  {goal.completed ? (
+                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <Circle className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1">
+                    <p className={`font-medium ${goal.completed ? 'text-green-700 dark:text-green-300' : ''}`}>
+                      {goal.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Progress Summary */}
+            <div className="mt-4 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold">Overall Progress</span>
+                <span className="text-sm font-bold">
+                  {caseGoals.filter((g) => g.completed).length} / {caseGoals.length} Goals
+                </span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2.5">
+                <div
+                  className="bg-primary h-2.5 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${(caseGoals.filter((g) => g.completed).length / caseGoals.length) * 100}%`,
+                  }}
+                />
+              </div>
+              {caseGoals.every((g) => g.completed) && (
+                <p className="mt-3 text-sm text-green-600 dark:text-green-400 font-semibold">
+                  ✓ Congratulations! All case objectives completed!
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Current Patient Status Summary */}
+      {currentCase && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Current Patient Status</CardTitle>
+            <CardDescription>Real-time physiological parameters</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">MAP</p>
+                <p className="text-lg font-bold">
+                  {formatNumber(patientState.vitals.meanArterialPressure, 0)} mmHg
+                </p>
+                <p className="text-xs text-muted-foreground">(Target: ≥65)</p>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">Cardiac Output</p>
+                <p className="text-lg font-bold">{formatNumber(patientState.vitals.cardiacOutput, 1)} L/min</p>
+                <p className="text-xs text-muted-foreground">(Normal: 4-8)</p>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">pH</p>
+                <p className="text-lg font-bold">{formatNumber(patientState.abg.pH, 2)}</p>
+                <p className="text-xs text-muted-foreground">(Normal: 7.35-7.45)</p>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">Lactate</p>
+                <p className="text-lg font-bold">{formatNumber(patientState.abg.lactate, 1)} mmol/L</p>
+                <p className="text-xs text-muted-foreground">(Normal: {'<'}2)</p>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">SpO₂</p>
+                <p className="text-lg font-bold">{formatNumber(patientState.abg.sO2, 0)}%</p>
+                <p className="text-xs text-muted-foreground">(Target: {'≥'}92)</p>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">Tidal Volume</p>
+                <p className="text-lg font-bold">{formatNumber(patientState.ventilator.tidalVolume, 0)} mL</p>
+                <p className="text-xs text-muted-foreground">(ARDS: 6 mL/kg)</p>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">PEEP</p>
+                <p className="text-lg font-bold">{formatNumber(patientState.ventilator.peep, 0)} cmH₂O</p>
+                <p className="text-xs text-muted-foreground">(ARDS: 8-15)</p>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">Interventions</p>
+                <p className="text-lg font-bold">{interventions.length}</p>
+                <p className="text-xs text-muted-foreground">Total made</p>
               </div>
             </div>
           </CardContent>
