@@ -1,11 +1,77 @@
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Slider } from '@/components/ui/Slider';
 import { useSimulationStore } from '@/store/useSimulationStore';
 import { formatNumber } from '@/lib/utils';
-import { Zap, TrendingDown, Heart, Activity } from 'lucide-react';
+import { simulateFluidBolus, simulateVasopressor } from '@/lib/simulation-engine';
+import { Zap, TrendingDown, Heart, Activity, Syringe } from 'lucide-react';
 
 export function ShockPathways() {
-  const { patientState } = useSimulationStore();
+  const { patientState, updatePatientState, addIntervention } = useSimulationStore();
   const { shock, vitals, abg } = patientState;
+
+  const [selectedVasopressor, setSelectedVasopressor] = useState<'norepinephrine' | 'vasopressin' | 'phenylephrine'>('norepinephrine');
+  const [vasopressorDose, setVasopressorDose] = useState(0.1);
+  const [inotropeDose, setInotropeDose] = useState(5);
+
+  const handleFluidBolus = (volume: number) => {
+    const newVitals = simulateFluidBolus(vitals, volume, 'Crystalloid');
+
+    // Improve lactate with successful resuscitation
+    const lactateDrop = vitals.centralVenousPressure < 8 ? 0.3 : 0.1;
+    const newAbg = {
+      ...abg,
+      lactate: Math.max(abg.lactate - lactateDrop, 0.8),
+    };
+
+    updatePatientState({ vitals: newVitals, abg: newAbg });
+    addIntervention({
+      id: `fluid-bolus-${Date.now()}`,
+      type: 'Fluid',
+      description: `${volume} mL fluid bolus for shock resuscitation`,
+      timestamp: new Date(),
+      parameters: { volume, type: 'crystalloid' },
+    });
+  };
+
+  const handleVasopressor = () => {
+    const newVitals = simulateVasopressor(vitals, selectedVasopressor, vasopressorDose);
+
+    updatePatientState({ vitals: newVitals });
+    addIntervention({
+      id: `vasopressor-${Date.now()}`,
+      type: 'Medication',
+      description: `${selectedVasopressor} ${vasopressorDose} mcg/kg/min`,
+      timestamp: new Date(),
+      parameters: { medication: selectedVasopressor, dose: vasopressorDose },
+    });
+  };
+
+  const handleInotrope = () => {
+    // Dobutamine increases CO and decreases SVR (inotrope + vasodilator)
+    const newVitals = {
+      ...vitals,
+      cardiacOutput: vitals.cardiacOutput + inotropeDose * 0.15,
+      systemicVascularResistance: vitals.systemicVascularResistance - inotropeDose * 10,
+      heartRate: vitals.heartRate + inotropeDose * 0.5,
+    };
+
+    // Improved CO helps lactate clearance
+    const newAbg = {
+      ...abg,
+      lactate: Math.max(abg.lactate - 0.4, 0.8),
+    };
+
+    updatePatientState({ vitals: newVitals, abg: newAbg });
+    addIntervention({
+      id: `inotrope-${Date.now()}`,
+      type: 'Medication',
+      description: `Dobutamine ${inotropeDose} mcg/kg/min for cardiogenic shock`,
+      timestamp: new Date(),
+      parameters: { medication: 'dobutamine', dose: inotropeDose },
+    });
+  };
 
   const shockTypes = [
     {
@@ -105,6 +171,148 @@ export function ShockPathways() {
               <p className="text-sm">{shock.markers.join(' • ')}</p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Interactive Shock Treatment */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Syringe className="w-5 h-5" />
+            Shock Resuscitation Simulator
+          </CardTitle>
+          <CardDescription>
+            Practice evidence-based shock management with real-time response
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Fluid Resuscitation */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-sm">Fluid Resuscitation</h3>
+              <div className="space-y-2">
+                <Button
+                  onClick={() => handleFluidBolus(500)}
+                  variant="outline"
+                  className="w-full"
+                  disabled={vitals.centralVenousPressure > 12}
+                >
+                  500 mL Bolus
+                </Button>
+                <Button
+                  onClick={() => handleFluidBolus(1000)}
+                  variant="outline"
+                  className="w-full"
+                  disabled={vitals.centralVenousPressure > 12}
+                >
+                  1000 mL Bolus
+                </Button>
+              </div>
+              {vitals.centralVenousPressure > 12 && (
+                <p className="text-xs text-destructive">CVP high - risk of volume overload</p>
+              )}
+              {vitals.centralVenousPressure < 8 && shock.type.includes('Distributive') && (
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  ✓ Low CVP in septic shock - fluid responsive
+                </p>
+              )}
+            </div>
+
+            {/* Vasopressor Selection */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-sm">Vasopressor Therapy</h3>
+              <div className="space-y-2">
+                <select
+                  value={selectedVasopressor}
+                  onChange={(e) => setSelectedVasopressor(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                >
+                  <option value="norepinephrine">Norepinephrine</option>
+                  <option value="vasopressin">Vasopressin</option>
+                  <option value="phenylephrine">Phenylephrine</option>
+                </select>
+                <Slider
+                  label="Dose"
+                  unit="mcg/kg/min"
+                  min={0.01}
+                  max={0.5}
+                  step={0.01}
+                  value={vasopressorDose}
+                  onChange={(e) => setVasopressorDose(Number(e.target.value))}
+                />
+                <Button onClick={handleVasopressor} className="w-full">
+                  Start Vasopressor
+                </Button>
+              </div>
+              {vitals.meanArterialPressure < 65 && (
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  ✓ MAP {'<'} 65 - vasopressor indicated
+                </p>
+              )}
+            </div>
+
+            {/* Inotropic Support */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-sm">Inotropic Support</h3>
+              <p className="text-xs text-muted-foreground">For cardiogenic shock</p>
+              <Slider
+                label="Dobutamine"
+                unit="mcg/kg/min"
+                min={2.5}
+                max={20}
+                step={2.5}
+                value={inotropeDose}
+                onChange={(e) => setInotropeDose(Number(e.target.value))}
+              />
+              <Button
+                onClick={handleInotrope}
+                variant="outline"
+                className="w-full"
+                disabled={!shock.type.includes('Cardiogenic')}
+              >
+                Start Inotrope
+              </Button>
+              {shock.type.includes('Cardiogenic') && vitals.cardiacOutput < 4 && (
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  ✓ Low CO in cardiogenic shock - inotrope indicated
+                </p>
+              )}
+              {!shock.type.includes('Cardiogenic') && (
+                <p className="text-xs text-muted-foreground">
+                  Inotropes primarily for cardiogenic shock
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Response Metrics */}
+          <div className="mt-6 p-4 bg-muted rounded-lg">
+            <h4 className="font-semibold text-sm mb-3">Monitor Response to Therapy</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground">MAP Target</p>
+                <p className={`font-bold ${vitals.meanArterialPressure >= 65 ? 'text-green-500' : 'text-red-500'}`}>
+                  {vitals.meanArterialPressure >= 65 ? '✓ ≥65 mmHg' : '✗ <65 mmHg'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Lactate Trend</p>
+                <p className={`font-bold ${abg.lactate < 2 ? 'text-green-500' : 'text-yellow-500'}`}>
+                  {formatNumber(abg.lactate, 1)} mmol/L
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Cardiac Output</p>
+                <p className={`font-bold ${vitals.cardiacOutput >= 4 ? 'text-green-500' : 'text-yellow-500'}`}>
+                  {formatNumber(vitals.cardiacOutput, 1)} L/min
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">CVP</p>
+                <p className="font-bold">{formatNumber(vitals.centralVenousPressure, 0)} mmHg</p>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
