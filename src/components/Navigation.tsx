@@ -9,7 +9,10 @@ import {
   LayoutDashboard,
   GraduationCap,
   Menu,
-  X
+  X,
+  Beaker,
+  Book,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,11 +26,14 @@ const navItems = [
   { id: 'hemodynamics', label: 'Hemodynamics Lab', icon: Heart },
   { id: 'ventilation', label: 'Ventilation Lab', icon: Wind },
   { id: 'acid-base', label: 'Acid-Base Analyzer', icon: Activity },
+  { id: 'electrolytes', label: 'Electrolyte Explorer', icon: Beaker },
   { id: 'renal', label: 'Renal Function', icon: Droplets },
   { id: 'shock', label: 'Shock Pathways', icon: Zap },
   { id: 'matrix', label: 'ICU Matrix Dashboard', icon: LayoutDashboard },
   { id: 'cases', label: 'Case Engine', icon: BookOpen },
   { id: 'assessment', label: 'Assessment Hub', icon: GraduationCap },
+  { id: 'glossary', label: 'Glossary', icon: Book },
+  { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
 export function Navigation({ currentPage, onNavigate }: NavigationProps) {

@@ -2,9 +2,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useSimulationStore } from '@/store/useSimulationStore';
 import { formatNumber } from '@/lib/utils';
 import { Activity, Heart, Wind, Droplets, Zap, TrendingUp } from 'lucide-react';
+import { InterventionHistory } from '@/components/InterventionHistory';
 
 export function MatrixDashboard() {
-  const { patientState } = useSimulationStore();
+  const { patientState, interventions } = useSimulationStore();
   const { vitals, ventilator, abg, electrolytes, renal, shock } = patientState;
 
   const systemCards = [
@@ -269,6 +270,15 @@ export function MatrixDashboard() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Intervention History */}
+      {interventions.length > 0 && (
+        <Card className="mt-6">
+          <CardContent className="pt-6">
+            <InterventionHistory interventions={interventions} />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

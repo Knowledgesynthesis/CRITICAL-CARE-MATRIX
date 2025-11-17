@@ -7,9 +7,11 @@ import { simulateVentilatorChange, simulatePEEPEffect, calculatePF_Ratio } from 
 import { formatNumber } from '@/lib/utils';
 import { Wind, Activity } from 'lucide-react';
 import type { VentilatorMode } from '@/types';
+import { ABGChart } from '@/components/visualizations/ABGChart';
+import { InterventionHistory } from '@/components/InterventionHistory';
 
 export function VentilationLab() {
-  const { patientState, updatePatientState, addIntervention } = useSimulationStore();
+  const { patientState, updatePatientState, addIntervention, interventions, historicalData } = useSimulationStore();
   const { ventilator, abg, vitals } = patientState;
 
   const [tidalVolume, setTidalVolume] = useState(ventilator.tidalVolume);
@@ -264,6 +266,20 @@ export function VentilationLab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Visualizations */}
+      {historicalData.length > 1 && (
+        <div className="mt-6">
+          <ABGChart data={historicalData} />
+        </div>
+      )}
+
+      {/* Intervention History */}
+      {interventions.length > 0 && (
+        <div className="mt-6">
+          <InterventionHistory interventions={interventions} />
+        </div>
+      )}
 
       <div className="mt-6">
         <Button onClick={handleReset} variant="outline">
