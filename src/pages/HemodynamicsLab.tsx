@@ -10,9 +10,12 @@ import {
 } from '@/lib/simulation-engine';
 import { formatNumber } from '@/lib/utils';
 import { Activity, Droplet, TrendingUp } from 'lucide-react';
+import { HemodynamicChart } from '@/components/visualizations/HemodynamicChart';
+import { FrankStarlingCurve } from '@/components/visualizations/FrankStarlingCurve';
+import { InterventionHistory } from '@/components/InterventionHistory';
 
 export function HemodynamicsLab() {
-  const { patientState, updatePatientState, addIntervention } = useSimulationStore();
+  const { patientState, updatePatientState, addIntervention, interventions, historicalData } = useSimulationStore();
   const { vitals, abg, shock } = patientState;
 
   const [fluidVolume, setFluidVolume] = useState(500);
@@ -289,6 +292,21 @@ export function HemodynamicsLab() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Visualizations */}
+      {historicalData.length > 1 && (
+        <div className="mt-6 space-y-6">
+          <HemodynamicChart data={historicalData} />
+          <FrankStarlingCurve currentCVP={vitals.centralVenousPressure} currentCO={vitals.cardiacOutput} />
+        </div>
+      )}
+
+      {/* Intervention History */}
+      {interventions.length > 0 && (
+        <div className="mt-6">
+          <InterventionHistory interventions={interventions} />
+        </div>
+      )}
 
       <div className="mt-6">
         <Button onClick={handleReset} variant="outline">

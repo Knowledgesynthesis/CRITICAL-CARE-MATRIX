@@ -4,11 +4,14 @@ import { Home } from './pages/Home';
 import { HemodynamicsLab } from './pages/HemodynamicsLab';
 import { VentilationLab } from './pages/VentilationLab';
 import { AcidBaseAnalyzer } from './pages/AcidBaseAnalyzer';
+import { ElectrolyteExplorer } from './pages/ElectrolyteExplorer';
 import { RenalFunction } from './pages/RenalFunction';
 import { ShockPathways } from './pages/ShockPathways';
 import { MatrixDashboard } from './pages/MatrixDashboard';
 import { CaseEngine } from './pages/CaseEngine';
 import { AssessmentHub } from './pages/AssessmentHub';
+import { Glossary } from './pages/Glossary';
+import { Settings } from './pages/Settings';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
@@ -23,6 +26,8 @@ function App() {
         return <VentilationLab />;
       case 'acid-base':
         return <AcidBaseAnalyzer />;
+      case 'electrolytes':
+        return <ElectrolyteExplorer />;
       case 'renal':
         return <RenalFunction />;
       case 'shock':
@@ -33,6 +38,10 @@ function App() {
         return <CaseEngine />;
       case 'assessment':
         return <AssessmentHub />;
+      case 'glossary':
+        return <Glossary />;
+      case 'settings':
+        return <Settings />;
       default:
         return <Home onNavigate={setCurrentPage} />;
     }
