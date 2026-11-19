@@ -1,0 +1,173 @@
+import type { AbgInput } from '@/engine/acidBase';
+
+export type CoreLabel = 'met-acid' | 'met-alk' | 'resp-acid' | 'resp-alk';
+
+export interface AbgCase {
+  id: string;
+  title: string;
+  vignette: string;
+  input: AbgInput;
+  answer: CoreLabel[];
+  anionGap?: 'high' | 'normal';
+  teaching: string;
+}
+
+export const ABG_CASES: AbgCase[] = [
+  {
+    id: 'pyloric',
+    title: 'Projectile vomiting',
+    vignette: '5-week-old boy, 4 days of non-bilious projectile vomiting, hungry after feeds.',
+    input: { ph: 7.52, paco2: 47, hco3: 37.4, na: 133, cl: 84, k: 3.0 },
+    answer: ['met-alk'],
+    teaching:
+      'Hypochloremic, hypokalemic metabolic alkalosis with appropriate hypoventilation = pyloric stenosis. Resuscitate with 0.9% saline + dextrose + KCl; surgery waits until Cl⁻ ≥100 and HCO₃⁻ <30 (post-op apnea risk with alkalosis).',
+  },
+  {
+    id: 'dka',
+    title: 'New-onset diabetes',
+    vignette: '10-year-old, 3 weeks of polyuria, now vomiting and breathing deeply.',
+    input: { ph: 7.08, paco2: 17, hco3: 5.0, na: 132, cl: 98, k: 5.6, albumin: 4.0, glucose: 520 },
+    answer: ['met-acid'],
+    anionGap: 'high',
+    teaching:
+      'Severe DKA (pH <7.1, HCO₃⁻ <5): AG 29 with Δ ratio ≈0.9 (pure HAGMA) and Winter\'s-appropriate Kussmaul breathing. Total-body K⁺ is depleted despite K⁺ 5.6. If this child needs intubation, match the low PaCO₂ – normalizing it precipitates catastrophic acidemia.',
+  },
+  {
+    id: 'dka-recovery',
+    title: 'DKA, hour 10',
+    vignette: 'Same child after 10 h of 0.9% saline and insulin. Ketones falling, glucose 210 mg/dL.',
+    input: { ph: 7.25, paco2: 28, hco3: 12.1, na: 140, cl: 116, albumin: 3.6 },
+    answer: ['met-acid'],
+    anionGap: 'normal',
+    teaching:
+      'AG has closed (≈12 corrected) but HCO₃⁻ is still low: hyperchloremic NAGMA from saline and urinary ketone (bicarbonate-precursor) loss. Track β-hydroxybutyrate, not HCO₃⁻ alone. Balanced fluids reduce this.',
+  },
+  {
+    id: 'diarrhea',
+    title: 'Infant gastroenteritis',
+    vignette: '9-month-old with 4 days of watery diarrhea, 8% dehydrated.',
+    input: { ph: 7.24, paco2: 26, hco3: 10.9, na: 136, cl: 114, k: 3.1, urineNa: 15, urineK: 20, urineCl: 60 },
+    answer: ['met-acid'],
+    anionGap: 'normal',
+    teaching: 'Normal-AG acidosis with negative urine AG (kidney excreting NH₄⁺ normally) → GI bicarbonate loss. Correct volume and potassium.',
+  },
+  {
+    id: 'bronchiolitis-fatigue',
+    title: 'Tiring bronchiolitic',
+    vignette: '7-week-old on HFNC, apneic pauses, now drowsy.',
+    input: { ph: 7.22, paco2: 65, hco3: 26.3 },
+    answer: ['resp-acid'],
+    teaching:
+      'Acute respiratory acidosis (HCO₃⁻ rises ~1 per 10 mmHg). Young infants tire fast and can become apneic – escalate to CPAP/NIV or intubation.',
+  },
+  {
+    id: 'bpd',
+    title: 'Ex-preterm with BPD',
+    vignette: '6-month-old ex-26-weeker with bronchopulmonary dysplasia on chronic furosemide and chlorothiazide.',
+    input: { ph: 7.36, paco2: 62, hco3: 34.6, na: 134, cl: 88, k: 3.2 },
+    answer: ['resp-acid', 'met-alk'],
+    teaching:
+      'Chronic compensation predicts HCO₃⁻ 30–33; 34.6 means an added metabolic (contraction/diuretic) alkalosis. Hypochloremia and hypokalemia blunt ventilatory drive – replace KCl before weaning support.',
+  },
+  {
+    id: 'septic-fatigue',
+    title: 'Septic shock, tiring',
+    vignette: '4-year-old with septic shock after 40 mL/kg fluid, grunting, mottled.',
+    input: { ph: 7.18, paco2: 38, hco3: 14.0, na: 135, cl: 100, albumin: 2.5, lactate: 8 },
+    answer: ['met-acid', 'resp-acid'],
+    anionGap: 'high',
+    teaching:
+      'Winter\'s predicts PaCO₂ 27–31. A "normal" 38 is a concurrent respiratory acidosis – this child is failing to compensate. Albumin 2.5 hides ~4 mmol/L of anion gap.',
+  },
+  {
+    id: 'salicylate',
+    title: 'Adolescent ingestion',
+    vignette: '15-year-old, tinnitus and vomiting after an intentional ingestion.',
+    input: { ph: 7.45, paco2: 22, hco3: 15.1, na: 140, cl: 103 },
+    answer: ['met-acid', 'resp-alk'],
+    anionGap: 'high',
+    teaching:
+      'Normal pH hiding two disorders: HAGMA plus primary respiratory alkalosis (central stimulation) = salicylate until proven otherwise. If intubated, keep minute ventilation high – a rise in PaCO₂ drives salicylate into the brain.',
+  },
+  {
+    id: 'urea-cycle',
+    title: 'Encephalopathic neonate',
+    vignette: '3-day-old, poor feeding, lethargy, tachypnea. Glucose normal, no fever.',
+    input: { ph: 7.53, paco2: 25, hco3: 20.6, na: 138, cl: 106 },
+    answer: ['resp-alk'],
+    teaching:
+      'Primary respiratory alkalosis in an encephalopathic neonate → measure ammonia now (urea cycle defect). Stop protein, give 10% dextrose at high GIR, start scavengers, call metabolic team; dialysis if NH₃ very high.',
+  },
+  {
+    id: 'organic-acidemia',
+    title: 'Neonate with vomiting and ketosis',
+    vignette: '6-day-old with vomiting, lethargy, large ketones, neutropenia.',
+    input: { ph: 7.1, paco2: 18, hco3: 5.5, na: 138, cl: 102, lactate: 3, glucose: 60 },
+    answer: ['met-acid'],
+    anionGap: 'high',
+    teaching:
+      'AG ≈30 with lactate only 3 – unmeasured organic acids. Ketosis in a neonate is never normal: think organic acidemia (MMA/propionic). Ammonia, urine organic acids, plasma acylcarnitines.',
+  },
+  {
+    id: 'saline',
+    title: 'Post-op saline',
+    vignette: '8-year-old after spine surgery, received 80 mL/kg 0.9% saline.',
+    input: { ph: 7.3, paco2: 36, hco3: 17.5, na: 142, cl: 117, albumin: 3.0 },
+    answer: ['met-acid'],
+    anionGap: 'normal',
+    teaching:
+      'Hyperchloremic (dilutional) NAGMA – Na−Cl difference 25. It is not lactic acidosis and does not need more fluid; switch to balanced crystalloid.',
+  },
+  {
+    id: 'asthma-early',
+    title: 'Early asthma',
+    vignette: '11-year-old, wheezy and anxious, 1 hour into an attack.',
+    input: { ph: 7.49, paco2: 30, hco3: 22.6 },
+    answer: ['resp-alk'],
+    teaching: 'Acute respiratory alkalosis is expected early. A rising or "normal" PaCO₂ (≥42) in a child still working hard is a sign of exhaustion.',
+  },
+  {
+    id: 'cf',
+    title: 'CF in a heatwave',
+    vignette: '3-year-old with cystic fibrosis, lethargic after a hot week, poor intake.',
+    input: { ph: 7.5, paco2: 46, hco3: 35.4, na: 128, cl: 80, k: 3.0 },
+    answer: ['met-alk'],
+    teaching: 'Pseudo-Bartter: salt and chloride loss in sweat → hyponatremic, hypochloremic, hypokalemic alkalosis. Treat with NaCl and KCl.',
+  },
+  {
+    id: 'ethylene-glycol',
+    title: 'Toxic alcohol',
+    vignette: '16-year-old, ataxic and vomiting, found with antifreeze.',
+    input: { ph: 7.15, paco2: 20, hco3: 6.8, na: 140, cl: 104, glucose: 100, bun: 14, measuredOsm: 320 },
+    answer: ['met-acid'],
+    anionGap: 'high',
+    teaching: 'HAGMA with osmolal gap ~29 → toxic alcohol. Fomepizole, consider hemodialysis; look for calcium oxalate crystals and hypocalcemia.',
+  },
+  {
+    id: 'arrest',
+    title: 'Post-arrest',
+    vignette: '2-year-old after drowning, ROSC after 12 min CPR, bagging slowly.',
+    input: { ph: 6.95, paco2: 70, hco3: 15.2, na: 139, cl: 102, lactate: 11 },
+    answer: ['met-acid', 'resp-acid'],
+    anionGap: 'high',
+    teaching: 'Combined respiratory and lactic acidosis. Fix ventilation first (target normal PaCO₂ for age); avoid hypoxemia and hyperoxemia (SpO₂ 94–99%).',
+  },
+  {
+    id: 'rta',
+    title: 'Faltering growth',
+    vignette: '2-year-old with poor growth, polyuria, nephrocalcinosis on ultrasound.',
+    input: { ph: 7.31, paco2: 32, hco3: 15.8, na: 138, cl: 112, k: 2.9, urineNa: 40, urineK: 30, urineCl: 45 },
+    answer: ['met-acid'],
+    anionGap: 'normal',
+    teaching: 'NAGMA with positive urine AG and hypokalemia → distal (type 1) RTA. Alkali therapy (citrate).',
+  },
+  {
+    id: 'hidden-hagma',
+    title: 'Hypoalbuminemic sepsis',
+    vignette: '7-year-old with nephrotic syndrome, peritonitis, cool peripheries.',
+    input: { ph: 7.33, paco2: 33, hco3: 17.2, na: 136, cl: 106, albumin: 1.8, lactate: 5 },
+    answer: ['met-acid'],
+    anionGap: 'high',
+    teaching: 'Raw AG 12.8 looks normal; albumin-corrected AG 18.3 reveals the lactic acidosis. Always correct the gap for albumin in the PICU.',
+  },
+];

@@ -1,0 +1,42 @@
+export interface GlossaryTerm {
+  term: string;
+  definition: string;
+}
+
+export const GLOSSARY: GlossaryTerm[] = [
+  { term: 'Anion gap (AG)', definition: 'Na − (Cl + HCO₃⁻). Normal 8–14 mmol/L; add 2.5 per 1 g/dL albumin below 4.' },
+  { term: 'Auto-PEEP', definition: 'Alveolar pressure above set PEEP at end-exhalation from incomplete emptying (short Te, long time constant).' },
+  { term: 'CAPD', definition: 'Cornell Assessment of Pediatric Delirium – validated bedside delirium screen.' },
+  { term: 'Capillary refill time (CRT)', definition: 'Time for color to return after 5 s of pressure on the sternum/finger; normal ≤2 s.' },
+  { term: 'Cold shock', definition: 'Low cardiac output with high SVR: cool mottled skin, CRT >3 s, narrow pulse pressure.' },
+  { term: 'Compensated shock', definition: 'Inadequate perfusion with normal blood pressure for age, maintained by tachycardia and vasoconstriction.' },
+  { term: 'CPP', definition: 'Cerebral perfusion pressure = MAP − ICP. Pediatric TBI target 40–50 mmHg by age.' },
+  { term: 'Delta ratio', definition: '(AG − 12)/(24 − HCO₃⁻); detects additional normal-AG acidosis (<0.8) or metabolic alkalosis (>2).' },
+  { term: 'Driving pressure (ΔP)', definition: 'Plateau pressure − total PEEP; reflects tidal stress relative to aerated lung. PALICC-2 limit ≤15 cmH₂O.' },
+  { term: 'Duct-dependent lesion', definition: 'Congenital heart defect needing a patent ductus arteriosus for systemic or pulmonary blood flow; treated with PGE1.' },
+  { term: 'Fluid overload (FO%)', definition: '(Fluid in − out, L) / admission weight (kg) × 100. >10–20% associated with worse outcomes.' },
+  { term: 'FLACC', definition: 'Face, Legs, Activity, Cry, Consolability – pain score for pre-verbal/non-verbal children.' },
+  { term: 'GIR', definition: 'Glucose infusion rate (mg/kg/min) = dextrose % × mL/h ÷ (6 × weight).' },
+  { term: 'Guyton diagram', definition: 'Cardiac function (Starling) and venous return curves plotted against right atrial pressure; their intersection is cardiac output.' },
+  { term: 'HFNC', definition: 'Heated humidified high-flow nasal cannula; ~2 L/kg/min in infants with bronchiolitis.' },
+  { term: 'Holliday–Segar', definition: '4-2-1 mL/kg/h maintenance formula (100/50/20 mL/kg/day).' },
+  { term: 'Mean systemic filling pressure (Pmsf)', definition: 'Pressure in the circulation at zero flow; upstream driver of venous return, raised by volume and venoconstriction.' },
+  { term: 'OI', definition: 'Oxygenation index = mean airway pressure × FiO₂ × 100 / PaO₂. PARDS ≥4; severe ≥16.' },
+  { term: 'OSI', definition: 'Oxygen saturation index = mean airway pressure × FiO₂ × 100 / SpO₂ (valid when SpO₂ ≤97%). PARDS ≥5; severe ≥12.' },
+  { term: 'PALICC-2', definition: 'Second Pediatric Acute Lung Injury Consensus Conference (2023) – definitions and management of PARDS.' },
+  { term: 'PARDS', definition: 'Pediatric ARDS: acute hypoxemia within 7 days of an insult with new parenchymal opacities, not explained by cardiac failure/fluid overload.' },
+  { term: 'PBW', definition: 'Predicted body weight from height; tidal volume uses the lesser of predicted and actual weight.' },
+  { term: 'Phoenix Sepsis Score', definition: '2024 pediatric organ-dysfunction score (respiratory, cardiovascular, coagulation, neurologic). Sepsis ≥2 with infection.' },
+  { term: 'PICS-p', definition: 'Post-intensive care syndrome–pediatrics: physical, cognitive, emotional and social sequelae for child and family.' },
+  { term: 'Plateau pressure (Pplat)', definition: 'Airway pressure during an inspiratory hold ≈ alveolar pressure. PALICC-2 ≤28 cmH₂O.' },
+  { term: 'Qp:Qs', definition: 'Pulmonary-to-systemic flow ratio = (SaO₂ − SvO₂)/(SpvO₂ − SpaO₂). Balanced single ventricle ≈1.' },
+  { term: 'Renal angina index (RAI)', definition: 'Risk × injury score on PICU day 0–1; ≥8 predicts severe AKI on day 3.' },
+  { term: 'ScvO₂', definition: 'Central venous O₂ saturation; reflects delivery vs consumption. SSC 2026 suggests ≥70% target.' },
+  { term: 'Shock index, pediatric-adjusted (SIPA)', definition: 'HR/SBP with age-specific cut-offs (>1.22 at 4–6 y, >1.0 at 7–12 y, >0.9 at 13–16 y).' },
+  { term: 'SIG', definition: 'Strong-ion gap = SIDa − SIDe; >3 mEq/L suggests unmeasured anions.' },
+  { term: 'Stressed volume', definition: 'Blood volume that stretches the vessel walls and generates Pmsf (~25–30% of total).' },
+  { term: 'Time constant (τ)', definition: 'Resistance × compliance; exhalation is ~95% complete after 3 τ.' },
+  { term: 'WAT-1', definition: 'Withdrawal Assessment Tool-1; score ≥3 suggests iatrogenic withdrawal.' },
+  { term: 'Warm shock', definition: 'Vasoplegia with high output: flash CRT, bounding pulses, low diastolic pressure.' },
+  { term: "Winter's formula", definition: 'Expected PaCO₂ in metabolic acidosis = 1.5 × HCO₃⁻ + 8 ± 2.' },
+];
