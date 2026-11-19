@@ -77,6 +77,13 @@ export interface HemoState {
   drugs: Drugs;
   cumulativeFluidPerKg: number;
   minutes: number;
+  /** baroreflex gain (1 = intact; ~0.15 after high spinal cord injury) */
+  reflexGain?: number;
+  /** vascular/cardiac responsiveness to catecholamines (1 = normal; low in adrenal insufficiency) */
+  drugGain?: number;
+  /** rate fixed by an arrhythmia (SVT) or heart block; null/undefined = sinus control */
+  fixedHr?: number | null;
+  steroidGiven?: boolean;
 }
 
 export interface HemoOutput {
@@ -133,7 +140,8 @@ export function makeBaseline(ageMonths: number, weightKg?: number, heightCm?: nu
   const rvr = (pmsf0 - cvp0) / co0;
   // infant ventricle: less preload reserve (smaller k = earlier plateau)
   const kFill = ageMonths < 12 ? 3 : ageMonths < 72 ? 3.5 : 4;
-  const hrK = ageMonths < 12 ? 265 : ageMonths < 72 ? 245 : ageMonths < 144 ? 230 : 215;
+  // output peaks at ≈0.76·hrK: ~186/min infants, ~175 young children, ~163 school age, ~152 adolescents
+  const hrK = ageMonths < 12 ? 245 : ageMonths < 72 ? 230 : ageMonths < 144 ? 215 : 200;
   const hrMax = ageMonths < 12 ? 220 : ageMonths < 72 ? 200 : 185;
   const g0 = hrFactorRaw(hr0, hrK);
   const fill0 = 1 - Math.exp(-(cvp0 + 0.5) / kFill); // spontaneous breathing: Pit ≈ −0.5 mmHg
@@ -281,19 +289,29 @@ interface Effective {
 
 /** Disease + drugs + baroreflex (reflex 0 = none, ~1 = maximal) → effective circulatory parameters. */
 function effective(b: Baseline, s: HemoState, reflex: number): Effective {
-  const fx = drugEffects(s.drugs);
+  const raw = drugEffects(s.drugs);
+  // catecholamine responsiveness scales each drug's deviation from baseline
+  const g = s.drugGain ?? 1;
+  const fx = {
+    contractility: 1 + (raw.contractility - 1) * g,
+    svr: 1 + (raw.svr - 1) * g,
+    hr: 1 + (raw.hr - 1) * g,
+    venoconstriction: raw.venoconstriction * g,
+    lactate: raw.lactate,
+  };
+  const r = reflex * (s.reflexGain ?? 1);
   // vasoplegia (low intrinsic SVR) blunts the reflex vasoconstrictor response
-  const reflexSvr = 1 + 0.9 * reflex * (reflex > 0 ? Math.min(1, s.svrFactor) : 1);
+  const reflexSvr = 1 + 0.9 * r * (r > 0 ? Math.min(1, s.svrFactor) : 1);
   const svrMult = s.svrFactor * fx.svr * reflexSvr;
   const pit = intrathoracicPressure(s);
   const peepPmsf = s.ventilated ? 0.12 * s.peep : 0;
-  const pmsf = Math.max(0.5, Math.max(1, s.vsPerKg + fx.venoconstriction + 4 * reflex) / b.csysPerKg + peepPmsf);
+  const pmsf = Math.max(0.5, Math.max(1, s.vsPerKg + fx.venoconstriction + 4 * r) / b.csysPerKg + peepPmsf);
   return { contr: s.contractility * fx.contractility, svrMult, pmsf, pit, drugLac: fx.lactate, fxHr: fx.hr };
 }
 
 function solveCirculation(b: Baseline, s: HemoState): CircSolve & Effective & { pressureLoad: number } {
   const fever = 1 + 0.07 * Math.max(0, s.tempC - 37);
-  let hr = b.hr0;
+  let hr = s.fixedHr ?? b.hr0;
   let reflex = 0;
   let e = effective(b, s, reflex);
   let res: CircSolve = { rap: b.cvp0, co: b.co0, sv: b.sv0, map: b.map0, hr, svr: b.svr0, pmsf: e.pmsf, reflex };
@@ -314,8 +332,8 @@ function solveCirculation(b: Baseline, s: HemoState): CircSolve & Effective & { 
     const mapDev = (b.map0 - map) / b.map0;
     const pressureTerm = mapDev >= 0 ? mapDev : mapDev < -0.1 ? 0.8 * (mapDev + 0.1) : 0;
     const deficit = clamp(pressureTerm + 0.6 * Math.max(0, 1 - ci / b.ci0), -0.4, 1);
-    const hrTarget = softHR(b.hr0 * e.fxHr * fever * (1 + s.sympathetic + 0.9 * deficit), b);
-    const nextHr = 0.7 * hr + 0.3 * hrTarget;
+    const hrTarget = softHR(b.hr0 * e.fxHr * fever * Math.max(0.3, 1 + s.sympathetic + 0.9 * deficit * (s.reflexGain ?? 1)), b);
+    const nextHr = s.fixedHr ? s.fixedHr : 0.7 * hr + 0.3 * hrTarget;
     const nextReflex = 0.7 * reflex + 0.3 * deficit;
     const done = iter > 3 && Math.abs(nextHr - hr) < 0.02 && Math.abs(nextReflex - reflex) < 0.0005;
     hr = nextHr;
@@ -464,7 +482,7 @@ export const SCENARIOS: Scenario[] = [
     defaultAgeMonths: 14,
     story: '14-month-old, 3 days of diarrhea and vomiting, sunken eyes, cool peripheries.',
     teaching: 'Blood pressure is preserved by tachycardia and vasoconstriction until late. Each 20 mL/kg bolus should produce a clear SV/HR response.',
-    state: { ...base, vsPerKg: 13, svrFactor: 1.05, sympathetic: 0.25, tempC: 37.6, leak: 0.15, ongoingLossPerKg: 1 },
+    state: { ...base, vsPerKg: 12.5, svrFactor: 1.25, sympathetic: 0.25, tempC: 37.6, leak: 0.15, ongoingLossPerKg: 1 },
   },
   {
     id: 'septic-cold',
@@ -513,6 +531,54 @@ export const SCENARIOS: Scenario[] = [
     story: '10-year-old pedestrian struck, splenic injury, ongoing bleeding.',
     teaching: 'Crystalloid dilutes hemoglobin and clotting factors; give blood early (balanced products, TXA) and control the source.',
     state: { ...base, vsPerKg: 10.5, hb: 7.5, svrFactor: 1.05, sympathetic: 0.3, leak: 0.15, ongoingLossPerKg: 3 },
+  },
+  {
+    id: 'septic-mixed',
+    label: 'Septic shock – late, mixed',
+    defaultAgeMonths: 60,
+    story: '5-year-old on day 2 of meningococcal sepsis: cool, low diastolic pressure, rising lactate despite epinephrine.',
+    teaching: 'Myocardial depression AND vasoplegia: one drug rarely fixes both. Combine inotropy (epinephrine/milrinone once BP allows) with tone (norepinephrine ± vasopressin); refractory → consider VA-ECMO.',
+    state: { ...base, contractility: 0.5, svrFactor: 0.6, vsPerKg: 16, leak: 0.6, sympathetic: 0.2, tempC: 39, inflammatoryLactate: 2, ongoingLossPerKg: 2.5 },
+  },
+  {
+    id: 'neurogenic',
+    label: 'Neurogenic (cervical cord injury)',
+    defaultAgeMonths: 84,
+    story: '7-year-old after a diving injury with C4 cord injury: hypotensive, warm, pink – and not tachycardic.',
+    teaching: 'Loss of sympathetic outflow: vasodilation with bradycardia and a blunted baroreflex. Modest fluid, then norepinephrine (α + β1) to restore tone and spinal cord perfusion; atropine or pacing for symptomatic bradycardia.',
+    state: { ...base, svrFactor: 0.68, vsPerKg: 18, sympathetic: -0.3, reflexGain: 0.15, contractility: 0.9 },
+  },
+  {
+    id: 'adrenal',
+    label: 'Adrenal crisis (salt-wasting CAH)',
+    defaultAgeMonths: 0.75,
+    story: '3-week-old boy with vomiting, weight loss, Na 122, K 7.4, glucose 40 – shocked and not responding to pressors.',
+    teaching: 'Glucocorticoid deficiency causes hypovolemia, vasoplegia and catecholamine resistance: vasoactives barely move the BP until hydrocortisone (50–100 mg/m²) is given. Also treat hypoglycemia and hyperkalemia.',
+    state: { ...base, vsPerKg: 13, svrFactor: 0.65, drugGain: 0.3, contractility: 0.8, sympathetic: 0.15, leak: 0.2 },
+  },
+  {
+    id: 'svt',
+    label: 'Tachyarrhythmia (SVT 290/min)',
+    defaultAgeMonths: 1.5,
+    story: '6-week-old with SVT for ~24 h: gray, sweaty, hepatomegaly.',
+    teaching: 'At extreme rates diastolic filling collapses, so stroke volume falls faster than rate rises, and hours of tachycardia depress contractility. Fluid adds congestion; terminating the rhythm restores output.',
+    state: { ...base, fixedHr: 290, contractility: 0.65, vsPerKg: 24, sympathetic: 0.1 },
+  },
+  {
+    id: 'heart-block',
+    label: 'Complete heart block (HR 38)',
+    defaultAgeMonths: 120,
+    story: '10-year-old after VSD closure with post-operative complete heart block and a junctional escape of 38/min.',
+    teaching: 'Output is rate-limited: stroke volume is already near maximal, so fluid adds little and chronotropes cannot reliably raise a fixed escape rhythm. Pacing restores cardiac output.',
+    state: { ...base, fixedHr: 38, contractility: 0.9, vsPerKg: 25, sympathetic: 0.1 },
+  },
+  {
+    id: 'lcos',
+    label: 'Low output after cardiac bypass',
+    defaultAgeMonths: 4,
+    story: '4-month-old 8 h after complete AV canal repair, ventilated: cool, oliguric, lactate rising.',
+    teaching: 'Post-bypass myocardial dysfunction with high SVR. Milrinone (inodilator) raises output and lowers SVR; pure vasoconstrictors raise BP but cut flow. PEEP unloads the LV but can limit RV filling.',
+    state: { ...base, contractility: 0.5, svrFactor: 1.3, vsPerKg: 22, tempC: 37.8, sympathetic: 0.15, ventilated: true, peep: 5 },
   },
 ];
 
@@ -582,6 +648,17 @@ export function intubate(s: HemoState, agent: InductionAgent): HemoState {
 
 export function decompress(s: HemoState): HemoState {
   return { ...s, pext: 0 };
+}
+
+/** Synchronized cardioversion (fixed tachyarrhythmia → sinus) or pacing (fixed bradycardia → paced at a normal rate). */
+export function treatRhythm(b: Baseline, s: HemoState): HemoState {
+  if (!s.fixedHr) return s;
+  return s.fixedHr > b.hr0 ? { ...s, fixedHr: null } : { ...s, fixedHr: b.hr0 };
+}
+
+/** Stress-dose hydrocortisone: restores catecholamine responsiveness and part of vascular tone. */
+export function giveHydrocortisone(s: HemoState): HemoState {
+  return { ...s, drugGain: 1, svrFactor: s.svrFactor + (1 - Math.min(1, s.svrFactor)) * 0.5, steroidGiven: true };
 }
 
 export const DRUG_META: Record<keyof Drugs, { label: string; unit: string; max: number; step: number; usual: string; action: string }> = {

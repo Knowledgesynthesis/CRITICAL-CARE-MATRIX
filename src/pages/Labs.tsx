@@ -7,25 +7,25 @@ const LABS = [
     to: '/labs/shock',
     title: 'Shock Lab',
     icon: Activity,
-    points: ['Guyton venous-return × Frank–Starling model scaled to age', '8 shock states incl. cold vs warm sepsis, myocarditis, tamponade', 'Bolus, blood, 6 vasoactives, PEEP, induction agents, decompression'],
+    points: ['Guyton venous-return × Frank–Starling model scaled to age', '14 shock states: cold/warm/late sepsis, hypovolemic, hemorrhagic, anaphylactic, cardiogenic, obstructive, neurogenic, adrenal crisis, SVT, heart block, post-bypass', 'Bolus, blood, 6 vasoactives, PEEP, induction agents, decompression, cardioversion/pacing, hydrocortisone'],
   },
   {
     to: '/labs/ventilator',
     title: 'Ventilator Lab',
     icon: Gauge,
-    points: ['VC/PC with R–C lung, auto-PEEP, recruitment and overdistension', 'Shunt vs V/Q oxygenation, dead space, OI/OSI', 'PALICC-2 alerts and live pressure/flow/volume waveforms'],
+    points: ['8 lung types (incl. stiff chest wall, cardiogenic edema, BPD) and 8 one-click scenarios', 'Shunt vs V/Q oxygenation, dead space, OI/OSI', 'PALICC-2 alerts and live pressure/flow/volume waveforms'],
   },
   {
     to: '/labs/acid-base',
     title: 'Acid–Base Lab',
     icon: FlaskConical,
-    points: ['Six-step interpretation with mixed-disorder detection', 'Albumin-corrected gap, delta ratio, osmolal gap, Stewart', '17 pediatric drills with feedback'],
+    points: ['Six-step interpretation with mixed-disorder detection', 'Albumin-corrected gap, delta ratio, osmolal gap, Stewart', '34 pediatric drills with feedback, picker and progress'],
   },
   {
     to: '/labs/fluids',
     title: 'Fluids & Electrolytes Lab',
     icon: Droplets,
-    points: ['Holliday–Segar, isotonic maintenance, GIR', 'Adrogué–Madias sodium prediction with safe-rate checks', 'Fluid overload %, glucose-corrected Na, corrected Ca'],
+    points: ['Holliday–Segar, isotonic maintenance, GIR', 'Adrogué–Madias sodium prediction with safe-rate checks and 5 worked examples', 'Fluid overload %, glucose-corrected Na, corrected Ca'],
   },
 ];
 

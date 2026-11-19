@@ -11,6 +11,7 @@ import {
   rateForGir,
 } from '@/engine/electrolytes';
 import { maintenanceDaily, maintenanceRate, tbwFraction } from '@/engine/peds';
+import { NA_EXAMPLES } from '@/content/naExamples';
 import { fluidOverloadPercent } from '@/engine/renal';
 import { useProgress } from '@/store/progress';
 import { fmt, round } from '@/lib/utils';
@@ -64,6 +65,9 @@ function Maintenance() {
 
 function Sodium() {
   const patient = useProgress((s) => s.patient);
+  const setPatient = useProgress((s) => s.setPatient);
+  const [exampleId, setExampleId] = useState('');
+  const example = NA_EXAMPLES.find((x) => x.id === exampleId);
   const [na, setNa] = useState<number | null>(122);
   const [glucose, setGlucose] = useState<number | null>(100);
   const [infId, setInfId] = useState('hts3');
@@ -81,6 +85,27 @@ function Sodium() {
       <Card>
         <CardHeader title="Predict the sodium change" subtitle={`Adrogué–Madias · TBW ${tbw} L (${tbwFraction(patient.ageMonths)} × weight)`} />
         <CardBody className="space-y-4">
+          <SelectField
+            label={`Load an example (${NA_EXAMPLES.length})`}
+            value={exampleId}
+            onChange={(id) => {
+              setExampleId(id);
+              const ex = NA_EXAMPLES.find((x) => x.id === id);
+              if (!ex) return;
+              setPatient({ ageMonths: ex.ageMonths, weightKg: ex.weightKg });
+              setNa(ex.na);
+              setGlucose(ex.glucose);
+              setInfId(ex.infusate);
+              setVol(ex.volume);
+              setChronic(ex.chronicity);
+            }}
+            options={[{ value: '', label: 'Custom' }, ...NA_EXAMPLES.map((x) => ({ value: x.id, label: x.label }))]}
+          />
+          {example && (
+            <Callout tone="info" title="Teaching point">
+              {example.note}
+            </Callout>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <NumberField label="Serum Na" unit="mmol/L" value={na} onChange={setNa} />
             <NumberField label="Glucose" unit="mg/dL" value={glucose} onChange={setGlucose} hint={corrected && glucose && glucose > 150 ? `Glucose-corrected Na ${fmt(corrected)}` : undefined} />

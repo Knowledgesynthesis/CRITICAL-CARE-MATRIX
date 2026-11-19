@@ -14,6 +14,7 @@ import {
   hco3From,
   ventAlerts,
   ventWaveforms,
+  VENT_SCENARIOS,
   type VentPatient,
   type VentSettings,
 } from '../respiratory';
@@ -28,6 +29,8 @@ import {
   passTime,
   NO_DRUGS,
   guytonCurves,
+  treatRhythm,
+  giveHydrocortisone,
   type HemoState,
 } from '../hemodynamics';
 import { interpretAcidBase, coreDisorders, wintersExpected } from '../acidBase';
@@ -231,6 +234,60 @@ describe('ventilator model', () => {
     const b = simulateVentilator({ ...ventPt(4, 55, 1), equipmentDeadSpaceMl: 15 }, vs({ rr: 35 }), lung('normal'));
     expect(b.paco2).toBeGreaterThan(a.paco2 * 1.4);
   });
+  const fromScenario = (id: string) => {
+    const sc = VENT_SCENARIOS.find((x) => x.id === id)!;
+    const h = peds.estimateHeight(sc.ageMonths);
+    const p: VentPatient = {
+      ...ventPt(sc.weightKg, h, sc.ageMonths),
+      pbwKg: peds.ventilationWeight(sc.weightKg, h),
+      ettId: sc.ettId ?? peds.equipment(sc.ageMonths, sc.weightKg).ettCuffed,
+      equipmentDeadSpaceMl: sc.deadSpaceMl ?? 5,
+    };
+    return { sc, p, l: lung(sc.lungId) };
+  };
+  it('every ventilator scenario is internally valid', () => {
+    for (const sc of VENT_SCENARIOS) {
+      expect(LUNG_PRESETS.some((l) => l.id === sc.lungId), sc.id).toBe(true);
+      expect(sc.settings.vtMlPerKg).toBeLessThanOrEqual(14);
+      expect(sc.settings.fio2).toBeGreaterThanOrEqual(0.21);
+      expect(sc.settings.fio2).toBeLessThanOrEqual(1);
+    }
+  });
+  it('scenario lessons hold: PALICC-2 fix, gas trapping, dead space, PEEP step-down', () => {
+    let x = fromScenario('pards-injurious');
+    const inj0 = simulateVentilator(x.p, x.sc.settings, x.l);
+    const inj1 = simulateVentilator(x.p, { ...x.sc.settings, vtMlPerKg: 6, peep: 14, rr: 30 }, x.l);
+    expect(inj0.drivingPressure).toBeGreaterThan(15);
+    expect(inj1.drivingPressure).toBeLessThanOrEqual(15);
+    expect(inj1.spo2).toBeGreaterThan(inj0.spo2 + 5);
+    x = fromScenario('asthma-fast');
+    const a0 = simulateVentilator(x.p, x.sc.settings, x.l);
+    const a1 = simulateVentilator(x.p, { ...x.sc.settings, rr: 12, ti: 0.8 }, x.l);
+    expect(a0.autoPeep - a1.autoPeep).toBeGreaterThan(4);
+    x = fromScenario('neonate-hme');
+    const h0 = simulateVentilator(x.p, x.sc.settings, x.l);
+    const h1 = simulateVentilator({ ...x.p, equipmentDeadSpaceMl: 2 }, x.sc.settings, x.l);
+    expect(h0.paco2 - h1.paco2).toBeGreaterThan(20);
+    x = fromScenario('pards-overdistended');
+    const o0 = simulateVentilator(x.p, x.sc.settings, x.l);
+    const o1 = simulateVentilator(x.p, { ...x.sc.settings, peep: 10 }, x.l);
+    expect(o1.oi).toBeLessThan(o0.oi);
+    expect(o1.pplat).toBeLessThan(o0.pplat - 5);
+    expect(o1.spo2).toBeGreaterThanOrEqual(o0.spo2);
+    x = fromScenario('cardiogenic');
+    const c0 = simulateVentilator(x.p, x.sc.settings, x.l);
+    const c1 = simulateVentilator(x.p, { ...x.sc.settings, peep: 9 }, x.l);
+    expect(c1.shuntFraction).toBeLessThan(c0.shuntFraction * 0.7);
+  });
+  it('per-lung targets: stiff chest wall tolerates Pplat 30, BPD tolerates larger Vt', () => {
+    const cw = lung('chest-wall');
+    const bpd = lung('bpd');
+    const p = ventPt(55, 160, 168);
+    const r = { ...simulateVentilator(p, vs(), cw), pplat: 30, vtPerKg: 7, drivingPressure: 12 };
+    expect(ventAlerts(r, vs(), cw, p).some((x) => x.text.includes('Pplat'))).toBe(false);
+    const rb = { ...simulateVentilator(ventPt(6, 66, 8), vs({ vtMlPerKg: 11 }), bpd), vtPerKg: 11 };
+    expect(ventAlerts(rb, vs({ vtMlPerKg: 11 }), bpd, ventPt(6, 66, 8)).some((x) => x.level === 'warn' && x.text.startsWith('Vt'))).toBe(false);
+  });
   it('stress: random settings never produce NaN or impossible values', () => {
     const r = rng(42);
     for (let i = 0; i < 3000; i++) {
@@ -280,6 +337,8 @@ describe('hemodynamic model', () => {
     const b = makeBaseline(sc.defaultAgeMonths);
     const s0 = scenarioState(sc, b);
     const o0 = computeHemodynamics(b, s0);
+    expect(o0.profile).toBe('compensated');
+    expect(o0.sbp).toBeGreaterThanOrEqual(peds.hypotensionSBP(b.ageMonths));
     expect(o0.hr).toBeGreaterThan(peds.heartRateRange(b.ageMonths).hi - 40);
     expect(o0.ci).toBeLessThan(0.85 * b.ci0);
     const o1 = computeHemodynamics(b, giveFluid(b, s0, 20, 'crystalloid'));
@@ -345,6 +404,49 @@ describe('hemodynamic model', () => {
     expect(giveFluid(b, s0, 20, 'crystalloid').hb).toBeLessThan(s0.hb);
     expect(giveFluid(b, s0, 15, 'prbc').hb).toBeGreaterThan(s0.hb + 1.5);
   });
+  const scen = (id: string) => {
+    const sc = SCENARIOS.find((x) => x.id === id)!;
+    const b = makeBaseline(sc.defaultAgeMonths);
+    return { b, s: scenarioState(sc, b) };
+  };
+  it('neurogenic shock: hypotension without tachycardia, norepinephrine restores MAP', () => {
+    const { b, s } = scen('neurogenic');
+    const o = computeHemodynamics(b, s);
+    expect(o.hypotensive || o.mapBelowP5).toBe(true);
+    expect(o.hr).toBeLessThan(peds.heartRateRange(b.ageMonths).hi);
+    const ne = computeHemodynamics(b, { ...s, drugs: { ...NO_DRUGS, norepinephrine: 0.15 } });
+    expect(ne.map).toBeGreaterThan(o.map + 15);
+  });
+  it('adrenal crisis: catecholamine resistance reversed by hydrocortisone', () => {
+    const { b, s } = scen('adrenal');
+    const base = computeHemodynamics(b, s);
+    const neOnly = computeHemodynamics(b, { ...s, drugs: { ...NO_DRUGS, norepinephrine: 0.15 } });
+    const neWithSteroid = computeHemodynamics(b, { ...giveHydrocortisone(s), drugs: { ...NO_DRUGS, norepinephrine: 0.15 } });
+    expect(neOnly.map - base.map).toBeLessThan(6);
+    expect(neWithSteroid.map - base.map).toBeGreaterThan(15);
+  });
+  it('SVT shock: cardioversion restores output; fluid mainly congests', () => {
+    const { b, s } = scen('svt');
+    const o = computeHemodynamics(b, s);
+    const fluid = computeHemodynamics(b, giveFluid(b, s, 20, 'crystalloid'));
+    const conv = computeHemodynamics(b, treatRhythm(b, s));
+    expect(conv.ci).toBeGreaterThan(o.ci * 1.3);
+    expect(conv.hr).toBeLessThan(200);
+    expect(fluid.liverEdgeCm).toBeGreaterThan(o.liverEdgeCm + 1);
+  });
+  it('complete heart block: pacing restores output', () => {
+    const { b, s } = scen('heart-block');
+    const o = computeHemodynamics(b, s);
+    const paced = computeHemodynamics(b, treatRhythm(b, s));
+    expect(o.hr).toBe(38);
+    expect(paced.ci).toBeGreaterThan(o.ci * 1.8);
+  });
+  it('post-bypass low output: milrinone raises CI, norepinephrine lowers it', () => {
+    const { b, s } = scen('lcos');
+    const o = computeHemodynamics(b, s);
+    expect(computeHemodynamics(b, { ...s, drugs: { ...NO_DRUGS, milrinone: 0.5 } }).ci).toBeGreaterThan(o.ci * 1.15);
+    expect(computeHemodynamics(b, { ...s, drugs: { ...NO_DRUGS, norepinephrine: 0.15 } }).ci).toBeLessThan(o.ci);
+  });
   it('Guyton operating point lies on both curves', () => {
     const b = makeBaseline(24);
     const g = guytonCurves(b, scenarioState(SCENARIOS[0], b));
@@ -376,7 +478,7 @@ describe('hemodynamic model', () => {
       const o = computeHemodynamics(b, s);
       expect(finite(o as unknown as Record<string, unknown>)).toBe(true);
       expect(o.hr).toBeGreaterThan(30);
-      expect(o.hr).toBeLessThan(260);
+      expect(o.hr).toBeLessThan(s.fixedHr ? 300 : 260);
       expect(o.ci).toBeGreaterThanOrEqual(0);
       expect(o.ci).toBeLessThan(12);
       expect(o.map).toBeLessThan(220); // extreme pressor stacking reaches catecholamine-crisis levels, never runaway

@@ -610,7 +610,7 @@ export const CORE_MODULES: Module[] = [
         { q: 'Delta ratio and meaning?', a: '(24.8 − 12)/(24 − 14) = 1.3 → pure high-AG acidosis. Management: restore perfusion and support ventilation – this child needs help breathing.' },
       ],
     },
-    tools: [{ to: '/labs/acid-base', label: 'Acid–Base Lab (analyzer + 17 drills)' }],
+    tools: [{ to: '/labs/acid-base', label: 'Acid–Base Lab (analyzer + 34 drills)' }],
     refs: ['berend-2014', 'ispad-2022'],
   },
   {

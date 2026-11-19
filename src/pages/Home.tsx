@@ -8,10 +8,10 @@ import { moduleIcon } from '@/components/icons';
 import { Card, CardBody, Page, ProgressBar, ProgressRing } from '@/components/ui';
 
 const LABS = [
-  { to: '/labs/shock', title: 'Shock Lab', text: 'Guyton/Starling simulator: fluids, 6 vasoactives, intubation, 8 shock states, age 0–17 y.', icon: Activity },
-  { to: '/labs/ventilator', title: 'Ventilator Lab', text: 'PALICC-2 targets, auto-PEEP, dead space, OI/OSI, live waveforms.', icon: Gauge },
-  { to: '/labs/acid-base', title: 'Acid–Base Lab', text: 'Six-step analyzer with Stewart view and 17 pediatric drills.', icon: FlaskConical },
-  { to: '/labs/fluids', title: 'Fluids Lab', text: 'Maintenance, GIR, sodium correction, fluid overload.', icon: Droplets },
+  { to: '/labs/shock', title: 'Shock Lab', text: 'Guyton/Starling simulator: 14 shock states incl. arrhythmias, neurogenic and adrenal crisis; fluids, 6 vasoactives, intubation, pacing.', icon: Activity },
+  { to: '/labs/ventilator', title: 'Ventilator Lab', text: '8 lung types, 8 one-click scenarios, PALICC-2 targets, auto-PEEP, dead space, live waveforms.', icon: Gauge },
+  { to: '/labs/acid-base', title: 'Acid–Base Lab', text: 'Six-step analyzer with Stewart view and 34 pediatric drills.', icon: FlaskConical },
+  { to: '/labs/fluids', title: 'Fluids Lab', text: 'Maintenance, GIR, sodium correction with 5 worked examples, fluid overload.', icon: Droplets },
 ];
 
 export default function Home() {

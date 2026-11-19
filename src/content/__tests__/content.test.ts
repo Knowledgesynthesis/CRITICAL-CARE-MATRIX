@@ -7,6 +7,11 @@ import { ABG_CASES } from '../abgCases';
 import { GLOSSARY } from '../glossary';
 import { DRUGS, INFUSIONS } from '@/engine/drugs';
 import { ROUTES } from '@/routes';
+import { NA_EXAMPLES } from '../naExamples';
+import { INFUSATES, deltaNaForVolume } from '@/engine/electrolytes';
+import { tbwFraction } from '@/engine/peds';
+import { SCENARIOS } from '@/engine/hemodynamics';
+import { VENT_SCENARIOS, LUNG_PRESETS } from '@/engine/respiratory';
 
 const refIds = new Set(REFERENCES.map((r) => r.id));
 const moduleIds = new Set(MODULES.map((m) => m.id));
@@ -106,5 +111,23 @@ describe('abg drills & glossary', () => {
   it('unique ids', () => {
     expect(new Set(ABG_CASES.map((c) => c.id)).size).toBe(ABG_CASES.length);
     expect(new Set(GLOSSARY.map((g) => g.term)).size).toBe(GLOSSARY.length);
+  });
+});
+
+describe('simulator presets', () => {
+  it('sodium examples use valid infusates and selectable ages', () => {
+    const ages = [0.25, 1, 3, 6, 9, 12, 18, ...Array.from({ length: 16 }, (_, i) => (i + 2) * 12)];
+    for (const ex of NA_EXAMPLES) {
+      expect(INFUSATES.some((x) => x.id === ex.infusate), ex.id).toBe(true);
+      expect(ages, ex.id).toContain(ex.ageMonths);
+    }
+    const hyper = NA_EXAMPLES.find((x) => x.id === 'hypernatremic-newborn')!;
+    const tbw = hyper.weightKg * tbwFraction(hyper.ageMonths);
+    expect(deltaNaForVolume(hyper.na, INFUSATES.find((x) => x.id === 'ns')!, tbw, 100)).toBeLessThan(0);
+  });
+  it('unique ids across shock scenarios, lung presets and vent scenarios', () => {
+    expect(new Set(SCENARIOS.map((x) => x.id)).size).toBe(SCENARIOS.length);
+    expect(new Set(LUNG_PRESETS.map((x) => x.id)).size).toBe(LUNG_PRESETS.length);
+    expect(new Set(VENT_SCENARIOS.map((x) => x.id)).size).toBe(VENT_SCENARIOS.length);
   });
 });

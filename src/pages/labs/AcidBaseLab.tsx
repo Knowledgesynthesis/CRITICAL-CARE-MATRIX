@@ -145,7 +145,14 @@ function Drills() {
   const correctLabels = sel.length === truth.labels.length && sel.every((x) => truth.labels.includes(x));
   const correctAg = !hasAg || (ag === 'high') === truth.highAg;
   const correct = correctLabels && correctAg;
-  const doneCount = Object.values(drills).filter((d) => d.correct).length;
+  const doneCount = ABG_CASES.filter((x) => drills[x.id]?.correct).length;
+  const nextUnsolved = (() => {
+    for (let k = 1; k <= ABG_CASES.length; k++) {
+      const j = (idx + k) % ABG_CASES.length;
+      if (!drills[ABG_CASES[j].id]?.correct) return j;
+    }
+    return null;
+  })();
 
   const go = (n: number) => {
     setIdx(((n % ABG_CASES.length) + ABG_CASES.length) % ABG_CASES.length);
@@ -182,6 +189,19 @@ function Drills() {
           }
         />
         <CardBody className="space-y-4">
+          <select
+            className="h-10 w-full rounded-lg border bg-background px-3 text-sm"
+            aria-label="Choose a drill"
+            value={idx}
+            onChange={(e) => go(Number(e.target.value))}
+          >
+            {ABG_CASES.map((x, i) => (
+              <option key={x.id} value={i}>
+                {drills[x.id]?.correct ? '✓ ' : drills[x.id] ? '✗ ' : ''}
+                {i + 1}. {x.title}
+              </option>
+            ))}
+          </select>
           <p className="text-sm">{c.vignette}</p>
           <dl className="grid grid-cols-3 gap-2 rounded-lg bg-monitor p-3 text-sm tabular">
             {vals
@@ -254,9 +274,16 @@ function Drills() {
               <Callout tone="info" title="Teaching">
                 {c.teaching}
               </Callout>
-              <Button onClick={() => go(idx + 1)}>
-                Next drill <ChevronRight className="h-4 w-4" />
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => go(idx + 1)}>
+                  Next drill <ChevronRight className="h-4 w-4" />
+                </Button>
+                {nextUnsolved !== null && nextUnsolved !== idx + 1 && (
+                  <Button variant="outline" onClick={() => go(nextUnsolved)}>
+                    Next unsolved
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </CardBody>
