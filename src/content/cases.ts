@@ -1,3 +1,6 @@
+import { EXTRA_CASES } from './cases-extra';
+import { balanceOptions } from './balance';
+
 export interface CaseVitals {
   hr?: number;
   sbp?: number;
@@ -41,7 +44,7 @@ export interface ClinicalCase {
   refs: string[];
 }
 
-export const CASES: ClinicalCase[] = [
+const CORE_CASES: ClinicalCase[] = [
   {
     id: 'cold-shock',
     title: 'The mottled infant',
@@ -767,3 +770,8 @@ export const CASES: ClinicalCase[] = [
     refs: ['kdigo-2012', 'taxicab-2022'],
   },
 ];
+
+export const CASES: ClinicalCase[] = [...CORE_CASES, ...EXTRA_CASES].map((c) => ({
+  ...c,
+  stages: c.stages.map((st) => ({ ...st, options: balanceOptions(`${c.id}/${st.id}`, st.options) })),
+}));

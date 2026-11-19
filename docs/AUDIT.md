@@ -17,6 +17,10 @@
 | 11 | DKA case | "Aggressive fluid resuscitation" and CPAP with RR 28 in DKA. | ISPAD 2022 / PECARN FLUID management; intubation guidance preserves compensatory hyperventilation. |
 | 12 | Build | Lint failed (6 errors); PWA icons and favicon referenced but missing; no tests; 700 kB single bundle. | Lint clean, icons generated, 98 tests, route-level code splitting. |
 
+## Found during the v2 content expansion
+
+- Correct answers sat in position B for 64% of questions (an "always pick B" learner would pass). Options are now balanced deterministically (`src/content/balance.ts`): numeric sets sorted ascending, others positioned by item id; a test keeps every position between 12% and 40%. Case options are balanced the same way.
+
 ## Blind spots filled
 
 - Pediatric definitions: Phoenix 2024 sepsis/septic shock; PALICC-2 PARDS (OI/OSI, NIV, possible PARDS).

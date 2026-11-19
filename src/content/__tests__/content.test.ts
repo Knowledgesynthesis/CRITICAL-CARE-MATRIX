@@ -57,15 +57,33 @@ describe('question bank', () => {
       q.refs.forEach((r) => expect(refIds.has(r), `${q.id} → ${r}`).toBe(true));
     }
   });
-  it('answer positions are spread (no "always B")', () => {
+  it('answer positions are balanced (no "always B" strategy)', () => {
     const counts = [0, 0, 0, 0];
     QUESTIONS.forEach((q) => counts[q.answer]++);
-    // no single position holds more than 70% of answers
-    expect(Math.max(...counts) / QUESTIONS.length).toBeLessThan(0.7);
+    for (const c of counts) {
+      expect(c / QUESTIONS.length).toBeGreaterThan(0.12);
+      expect(c / QUESTIONS.length).toBeLessThan(0.4);
+    }
+  });
+  it('numeric option sets are in ascending order', () => {
+    const num = (t: string) => /^[<>≥≤~≈]?\s*(-?\d+(?:\.\d+)?)/.exec(t.trim());
+    for (const q of QUESTIONS) {
+      const ms = q.options.map(num);
+      if (ms.every(Boolean)) {
+        const vals = ms.map((m) => Number(m![1]));
+        expect([...vals].sort((a, b) => a - b), q.id).toEqual(vals);
+      }
+    }
   });
 });
 
 describe('cases', () => {
+  it('correct options are spread across positions', () => {
+    const counts = [0, 0, 0, 0];
+    CASES.forEach((c) => c.stages.forEach((s) => counts[s.options.findIndex((o) => o.correct)]++));
+    const total = counts.reduce((a, b) => a + b, 0);
+    for (const n of counts) expect(n / total).toBeLessThan(0.45);
+  });
   it.each(CASES.map((c) => [c.id, c] as const))('%s: every stage has exactly one correct option and feedback', (_id, c) => {
     expect(moduleIds.has(c.module)).toBe(true);
     expect(c.stages.length).toBeGreaterThanOrEqual(3);

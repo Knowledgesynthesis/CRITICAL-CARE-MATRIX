@@ -56,6 +56,15 @@ export const REFERENCES: Reference[] = [
   { id: 'pepanic-2016', short: 'PEPaNIC 2016', year: 2016, kind: 'trial', citation: 'Fivez T, et al. Early versus late parenteral nutrition in critically ill children. N Engl J Med 2016;374:1111–1122.' },
   // Cardiac
   { id: 'primacorp-2003', short: 'PRIMACORP 2003', year: 2003, kind: 'trial', citation: 'Hoffman TM, et al. Efficacy and safety of milrinone in preventing low cardiac output syndrome after corrective surgery for congenital heart disease. Circulation 2003;107:996–1002.' },
+  // Added with the second case set
+  { id: 'anaphylaxis-2023', short: 'Anaphylaxis practice parameter 2023', year: 2024, kind: 'guideline', citation: 'Golden DBK, et al. Anaphylaxis: a 2023 practice parameter update. Ann Allergy Asthma Immunol 2024;132:124–176.' },
+  { id: 'extrip-2015', short: 'EXTRIP salicylates 2015', year: 2015, kind: 'consensus', citation: 'Juurlink DN, et al. Extracorporeal treatment for salicylate poisoning: systematic review and recommendations from the EXTRIP workgroup. Ann Emerg Med 2015;66:165–181.' },
+  { id: 'tls-2008', short: 'TLS guideline 2008', year: 2008, kind: 'guideline', citation: 'Coiffier B, et al. Guidelines for the management of pediatric and adult tumor lysis syndrome: an evidence-based review. J Clin Oncol 2008;26:2767–2778.' },
+  { id: 'ucd-2019', short: 'Urea cycle disorders 2019', year: 2019, kind: 'guideline', citation: 'Häberle J, et al. Suggested guidelines for the diagnosis and management of urea cycle disorders: first revision. J Inherit Metab Dis 2019;42:1192–1230.' },
+  { id: 'starr-2021', short: 'StARR 2021', year: 2021, kind: 'trial', citation: 'Garber AK, et al. Short-term outcomes of the Study of Refeeding to Optimize Inpatient Gains for patients with anorexia nervosa: a multicenter randomized clinical trial. JAMA Pediatr 2021;175:19–27.' },
+  { id: 'croup-cochrane-2018', short: 'Cochrane croup steroids 2018', year: 2018, kind: 'review', citation: 'Gates A, et al. Glucocorticoids for croup in children. Cochrane Database Syst Rev 2018;8:CD001955.' },
+  { id: 'apsa-2019', short: 'APSA solid-organ injury 2019', year: 2019, kind: 'review', citation: 'Gates RL, et al. Non-operative management of solid organ injuries in children: an APSA Outcomes and Evidence Based Practice Committee systematic review. J Pediatr Surg 2019;54:1519–1526.' },
+  { id: 'pedtrax-2014', short: 'PED-TRAX 2014', year: 2014, kind: 'trial', citation: 'Eckert MJ, et al. Tranexamic acid administration to pediatric trauma patients in a combat setting: the PED-TRAX study. J Trauma Acute Care Surg 2014;77:852–858.' },
 ];
 
 const byId = new Map(REFERENCES.map((r) => [r.id, r]));
