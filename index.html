@@ -2,13 +2,21 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Critical Care Matrix - Integrated ICU Physiology Simulator for Medical Education" />
-    <meta name="theme-color" content="#0f172a" />
-    <title>Critical Care Matrix - ICU Physiology Simulator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Interactive pediatric critical care curriculum: physiology simulators, PICU cases, bedside calculators and a 120-question bank built on 2023–2026 guidelines." />
+    <meta name="theme-color" content="#0a0f1a" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>PICU Matrix · Pediatric Critical Care</title>
+    <script>
+      try {
+        var s = JSON.parse(localStorage.getItem('picu-matrix-progress') || '{}');
+        if (s.state && s.state.theme === 'light') document.documentElement.classList.remove('dark');
+      } catch (e) {}
+    </script>
   </head>
   <body>
+    <noscript>PICU Matrix needs JavaScript.</noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

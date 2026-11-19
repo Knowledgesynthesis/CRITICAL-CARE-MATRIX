@@ -1,0 +1,990 @@
+/**
+ * Weight-based emergency and PICU drug reference.
+ * Doses: AHA/AAP PALS 2025, AES 2016 + ESETT, BTF 2019, ISPAD 2022, SSC Children 2026, standard pediatric references.
+ * Always verify against local formulary and the actual product concentration.
+ */
+import { round } from '@/lib/utils';
+
+export type DrugCategory = 'arrest' | 'arrhythmia' | 'rsi' | 'seizure' | 'icp' | 'airway' | 'metabolic' | 'antimicrobial' | 'blood';
+
+export const CATEGORY_LABEL: Record<DrugCategory, string> = {
+  arrest: 'Arrest & resuscitation',
+  arrhythmia: 'Arrhythmia & electricity',
+  rsi: 'Intubation (RSI)',
+  seizure: 'Status epilepticus',
+  icp: 'Raised ICP',
+  airway: 'Airway, asthma, anaphylaxis',
+  metabolic: 'Metabolic & electrolytes',
+  antimicrobial: 'Empiric antimicrobials',
+  blood: 'Blood & hemostasis',
+};
+
+export interface WeightBand {
+  maxKg: number; // exclusive upper bound
+  dose: number;
+}
+
+export interface DrugSpec {
+  id: string;
+  name: string;
+  category: DrugCategory;
+  indication: string;
+  route: string;
+  unit: string;
+  perKg?: number;
+  perKgHigh?: number;
+  bands?: WeightBand[];
+  max?: number;
+  concentration?: { perMl: number; label: string };
+  notes?: string;
+  refs: string[];
+}
+
+export const DRUGS: DrugSpec[] = [
+  // ---- Arrest
+  {
+    id: 'epi-iv',
+    name: 'Epinephrine (arrest)',
+    category: 'arrest',
+    indication: 'Cardiac arrest – all rhythms',
+    route: 'IV/IO',
+    unit: 'mg',
+    perKg: 0.01,
+    max: 1,
+    concentration: { perMl: 0.1, label: '0.1 mg/mL (1 mg/10 mL)' },
+    notes: 'Every 3–5 min. Non-shockable rhythm: first dose as early as possible.',
+    refs: ['pals-2025'],
+  },
+  {
+    id: 'epi-ett',
+    name: 'Epinephrine (endotracheal)',
+    category: 'arrest',
+    indication: 'Arrest with no IV/IO access',
+    route: 'ETT',
+    unit: 'mg',
+    perKg: 0.1,
+    max: 2.5,
+    concentration: { perMl: 1, label: '1 mg/mL' },
+    notes: 'Follow with 5 mL saline and 5 breaths. Absorption is unreliable – get IO access.',
+    refs: ['pals-2025'],
+  },
+  {
+    id: 'bolus',
+    name: 'Isotonic crystalloid bolus',
+    category: 'arrest',
+    indication: 'Hypovolemic / septic shock',
+    route: 'IV/IO',
+    unit: 'mL',
+    perKg: 10,
+    perKgHigh: 20,
+    max: 1000,
+    notes: 'Reassess after every bolus; stop for hepatomegaly, crackles, rising work of breathing. Cardiogenic: 5–10 mL/kg slowly.',
+    refs: ['ssc-peds-2026'],
+  },
+  {
+    id: 'dextrose',
+    name: 'Dextrose 10%',
+    category: 'arrest',
+    indication: 'Hypoglycemia',
+    route: 'IV/IO',
+    unit: 'g',
+    perKg: 0.2,
+    perKgHigh: 0.5,
+    max: 25,
+    concentration: { perMl: 0.1, label: 'D10 = 0.1 g/mL (2–5 mL/kg)' },
+    notes: 'Neonates 0.2 g/kg (2 mL/kg D10). Recheck glucose in 15 min; then a dextrose infusion.',
+    refs: ['pals-2025'],
+  },
+  {
+    id: 'naloxone',
+    name: 'Naloxone',
+    category: 'arrest',
+    indication: 'Opioid toxicity with respiratory depression',
+    route: 'IV/IO/IM/IN',
+    unit: 'mg',
+    perKg: 0.1,
+    max: 2,
+    concentration: { perMl: 0.4, label: '0.4 mg/mL' },
+    notes: 'For iatrogenic over-sedation titrate 1–5 mcg/kg to avoid acute withdrawal and pain crisis.',
+    refs: ['pals-2025'],
+  },
+  {
+    id: 'cacl',
+    name: 'Calcium chloride 10%',
+    category: 'arrest',
+    indication: 'Hyperkalemia, hypocalcemia, Ca-channel blocker toxicity',
+    route: 'IV/IO (central preferred)',
+    unit: 'mg',
+    perKg: 20,
+    max: 1000,
+    concentration: { perMl: 100, label: '100 mg/mL (0.2 mL/kg)' },
+    notes: 'Not routine in arrest. Extravasation causes necrosis.',
+    refs: ['pals-2025'],
+  },
+  {
+    id: 'cagluc',
+    name: 'Calcium gluconate 10%',
+    category: 'arrest',
+    indication: 'Hyperkalemia, symptomatic hypocalcemia',
+    route: 'IV/IO',
+    unit: 'mg',
+    perKg: 60,
+    perKgHigh: 100,
+    max: 3000,
+    concentration: { perMl: 100, label: '100 mg/mL (0.6–1 mL/kg)' },
+    notes: 'Over 5–10 min with ECG monitoring. Peripherally safe alternative to chloride.',
+    refs: ['pals-2025'],
+  },
+  {
+    id: 'bicarb',
+    name: 'Sodium bicarbonate 8.4%',
+    category: 'arrest',
+    indication: 'Hyperkalemia, Na-channel blocker (TCA) toxicity',
+    route: 'IV/IO',
+    unit: 'mEq',
+    perKg: 1,
+    max: 50,
+    concentration: { perMl: 1, label: '1 mEq/mL (use 4.2% in infants)' },
+    notes: 'Not routine in arrest or for lactic acidosis. Ensure ventilation (generates CO₂).',
+    refs: ['pals-2025'],
+  },
+  // ---- Arrhythmia
+  {
+    id: 'defib-1',
+    name: 'Defibrillation – 1st shock',
+    category: 'arrhythmia',
+    indication: 'VF / pulseless VT',
+    route: 'Pads',
+    unit: 'J',
+    perKg: 2,
+    max: 200,
+    notes: '2nd shock 4 J/kg; subsequent ≥4 J/kg up to 10 J/kg or adult maximum.',
+    refs: ['pals-2025'],
+  },
+  {
+    id: 'defib-2',
+    name: 'Defibrillation – 2nd shock',
+    category: 'arrhythmia',
+    indication: 'Persistent VF / pVT',
+    route: 'Pads',
+    unit: 'J',
+    perKg: 4,
+    max: 360,
+    refs: ['pals-2025'],
+  },
+  {
+    id: 'cardiovert',
+    name: 'Synchronized cardioversion',
+    category: 'arrhythmia',
+    indication: 'Unstable SVT / VT with pulse',
+    route: 'Pads (sync on)',
+    unit: 'J',
+    perKg: 0.5,
+    perKgHigh: 1,
+    max: 200,
+    notes: 'If ineffective increase to 2 J/kg. Sedate if it does not delay therapy.',
+    refs: ['pals-2025'],
+  },
+  {
+    id: 'adenosine-1',
+    name: 'Adenosine – 1st dose',
+    category: 'arrhythmia',
+    indication: 'SVT',
+    route: 'IV/IO rapid push',
+    unit: 'mg',
+    perKg: 0.1,
+    max: 6,
+    concentration: { perMl: 3, label: '3 mg/mL' },
+    notes: 'Most proximal IV, 2-syringe rapid flush, record the ECG. Vagal maneuvers first if stable (ice to face in infants).',
+    refs: ['pals-2025'],
+  },
+  {
+    id: 'adenosine-2',
+    name: 'Adenosine – 2nd dose',
+    category: 'arrhythmia',
+    indication: 'SVT persisting',
+    route: 'IV/IO rapid push',
+    unit: 'mg',
+    perKg: 0.2,
+    max: 12,
+    concentration: { perMl: 3, label: '3 mg/mL' },
+    refs: ['pals-2025'],
+  },
+  {
+    id: 'amiodarone',
+    name: 'Amiodarone',
+    category: 'arrhythmia',
+    indication: 'Shock-refractory VF/pVT; perfusing VT/SVT',
+    route: 'IV/IO',
+    unit: 'mg',
+    perKg: 5,
+    max: 300,
+    concentration: { perMl: 50, label: '50 mg/mL' },
+    notes: 'Arrest: rapid bolus, may repeat to 15 mg/kg. With a pulse: over 20–60 min (hypotension, QT).',
+    refs: ['pals-2025'],
+  },
+  {
+    id: 'lidocaine',
+    name: 'Lidocaine',
+    category: 'arrhythmia',
+    indication: 'Shock-refractory VF/pVT (alternative to amiodarone)',
+    route: 'IV/IO',
+    unit: 'mg',
+    perKg: 1,
+    max: 100,
+    concentration: { perMl: 20, label: '20 mg/mL (2%)' },
+    notes: 'Then 20–50 mcg/kg/min.',
+    refs: ['pals-2025'],
+  },
+  {
+    id: 'atropine',
+    name: 'Atropine',
+    category: 'arrhythmia',
+    indication: 'Bradycardia from vagal tone or AV block; RSI premedication when bradycardia risk is high',
+    route: 'IV/IO',
+    unit: 'mg',
+    perKg: 0.02,
+    max: 0.5,
+    concentration: { perMl: 0.1, label: '0.1 mg/mL' },
+    notes: 'Hypoxic bradycardia needs oxygenation/ventilation, then epinephrine – not atropine. Start CPR if HR <60 with poor perfusion despite ventilation.',
+    refs: ['pals-2025'],
+  },
+  // ---- RSI
+  {
+    id: 'ketamine',
+    name: 'Ketamine',
+    category: 'rsi',
+    indication: 'Induction (preferred in shock and bronchospasm)',
+    route: 'IV',
+    unit: 'mg',
+    perKg: 1,
+    perKgHigh: 2,
+    max: 200,
+    concentration: { perMl: 10, label: '10 mg/mL' },
+    notes: 'Use 0.5–1 mg/kg if catecholamine-depleted – it is a direct myocardial depressant when sympathetic reserve is exhausted.',
+    refs: ['ssc-peds-2026'],
+  },
+  {
+    id: 'etomidate',
+    name: 'Etomidate',
+    category: 'rsi',
+    indication: 'Induction (hemodynamically neutral)',
+    route: 'IV',
+    unit: 'mg',
+    perKg: 0.3,
+    max: 20,
+    concentration: { perMl: 2, label: '2 mg/mL' },
+    notes: 'SSC Children 2026 suggests against etomidate in septic shock (adrenal suppression).',
+    refs: ['ssc-peds-2026'],
+  },
+  {
+    id: 'propofol',
+    name: 'Propofol',
+    category: 'rsi',
+    indication: 'Induction in hemodynamically stable patients',
+    route: 'IV',
+    unit: 'mg',
+    perKg: 1,
+    perKgHigh: 2,
+    max: 200,
+    concentration: { perMl: 10, label: '10 mg/mL' },
+    notes: 'Vasodilation and myocardial depression – avoid in shock.',
+    refs: [],
+  },
+  {
+    id: 'fentanyl',
+    name: 'Fentanyl',
+    category: 'rsi',
+    indication: 'Analgesia / blunting pressor response',
+    route: 'IV',
+    unit: 'mcg',
+    perKg: 1,
+    perKgHigh: 2,
+    max: 100,
+    concentration: { perMl: 50, label: '50 mcg/mL' },
+    notes: 'Give slowly – rapid large doses cause chest-wall rigidity (esp. neonates).',
+    refs: [],
+  },
+  {
+    id: 'rocuronium',
+    name: 'Rocuronium',
+    category: 'rsi',
+    indication: 'Neuromuscular blockade',
+    route: 'IV',
+    unit: 'mg',
+    perKg: 1,
+    perKgHigh: 1.2,
+    max: 120,
+    concentration: { perMl: 10, label: '10 mg/mL' },
+    notes: 'Onset 45–60 s, duration 30–60 min. Reversal: sugammadex 16 mg/kg.',
+    refs: [],
+  },
+  {
+    id: 'succinylcholine',
+    name: 'Succinylcholine',
+    category: 'rsi',
+    indication: 'Neuromuscular blockade (short)',
+    route: 'IV',
+    unit: 'mg',
+    perKg: 1.5,
+    perKgHigh: 2,
+    max: 150,
+    concentration: { perMl: 20, label: '20 mg/mL' },
+    notes: 'Infants 2 mg/kg. Contraindicated: hyperkalemia, myopathy/muscular dystrophy, burns/crush/denervation >24–72 h, MH history. Bradycardia – have atropine ready.',
+    refs: [],
+  },
+  {
+    id: 'sugammadex',
+    name: 'Sugammadex (immediate reversal)',
+    category: 'rsi',
+    indication: 'Cannot-intubate-cannot-oxygenate after rocuronium',
+    route: 'IV',
+    unit: 'mg',
+    perKg: 16,
+    max: 1600,
+    concentration: { perMl: 100, label: '100 mg/mL' },
+    notes: 'Routine reversal 2–4 mg/kg.',
+    refs: [],
+  },
+  // ---- Seizures
+  {
+    id: 'midaz-im',
+    name: 'Midazolam IM',
+    category: 'seizure',
+    indication: 'Status epilepticus – first line (no IV)',
+    route: 'IM',
+    unit: 'mg',
+    perKg: 0.2,
+    max: 10,
+    concentration: { perMl: 5, label: '5 mg/mL' },
+    notes: 'AES: 5 mg if 13–40 kg, 10 mg if >40 kg. At 5 min of seizure.',
+    refs: ['aes-2016'],
+  },
+  {
+    id: 'midaz-in',
+    name: 'Midazolam intranasal / buccal',
+    category: 'seizure',
+    indication: 'Status epilepticus – first line (no IV)',
+    route: 'IN / buccal',
+    unit: 'mg',
+    perKg: 0.2,
+    perKgHigh: 0.3,
+    max: 10,
+    concentration: { perMl: 5, label: '5 mg/mL' },
+    notes: 'IN 0.2 mg/kg split between nostrils (≤1 mL per nostril); buccal 0.3 mg/kg.',
+    refs: ['aes-2016'],
+  },
+  {
+    id: 'lorazepam',
+    name: 'Lorazepam',
+    category: 'seizure',
+    indication: 'Status epilepticus – first line (IV)',
+    route: 'IV/IO',
+    unit: 'mg',
+    perKg: 0.1,
+    max: 4,
+    concentration: { perMl: 2, label: '2 mg/mL' },
+    notes: 'May repeat once at 5–10 min. Limit to two benzodiazepine doses in total (respiratory depression).',
+    refs: ['aes-2016'],
+  },
+  {
+    id: 'diazepam',
+    name: 'Diazepam IV',
+    category: 'seizure',
+    indication: 'Status epilepticus – first line (IV)',
+    route: 'IV',
+    unit: 'mg',
+    perKg: 0.15,
+    perKgHigh: 0.2,
+    max: 10,
+    concentration: { perMl: 5, label: '5 mg/mL' },
+    notes: 'Rectal 0.5 mg/kg (max 20 mg) if no access.',
+    refs: ['aes-2016'],
+  },
+  {
+    id: 'levetiracetam',
+    name: 'Levetiracetam',
+    category: 'seizure',
+    indication: 'Established SE – second line',
+    route: 'IV over 5–15 min',
+    unit: 'mg',
+    perKg: 60,
+    max: 4500,
+    concentration: { perMl: 100, label: '100 mg/mL' },
+    notes: 'ESETT/ConSEPT/EcLiPSE: ~45–50% cessation, similar to fosphenytoin and valproate; fewest adverse events.',
+    refs: ['esett-2019', 'aes-2016'],
+  },
+  {
+    id: 'fosphenytoin',
+    name: 'Fosphenytoin',
+    category: 'seizure',
+    indication: 'Established SE – second line',
+    route: 'IV',
+    unit: 'mg PE',
+    perKg: 20,
+    max: 1500,
+    concentration: { perMl: 50, label: '50 mg PE/mL' },
+    notes: 'Max rate 3 mg PE/kg/min (≤150 mg PE/min). Hypotension and arrhythmia – ECG monitoring.',
+    refs: ['esett-2019', 'aes-2016'],
+  },
+  {
+    id: 'valproate',
+    name: 'Valproate',
+    category: 'seizure',
+    indication: 'Established SE – second line',
+    route: 'IV over 10 min',
+    unit: 'mg',
+    perKg: 40,
+    max: 3000,
+    concentration: { perMl: 100, label: '100 mg/mL' },
+    notes: 'Avoid <2 y or suspected metabolic/mitochondrial disease (POLG), liver disease, pancreatitis, pregnancy.',
+    refs: ['esett-2019', 'aes-2016'],
+  },
+  {
+    id: 'phenobarbital',
+    name: 'Phenobarbital',
+    category: 'seizure',
+    indication: 'SE – second line (first line in neonates)',
+    route: 'IV over 10–20 min',
+    unit: 'mg',
+    perKg: 20,
+    max: 1000,
+    concentration: { perMl: 65, label: '65 mg/mL' },
+    notes: 'Respiratory depression and hypotension, especially after benzodiazepines.',
+    refs: ['aes-2016'],
+  },
+  // ---- ICP
+  {
+    id: 'hts3',
+    name: '3% saline',
+    category: 'icp',
+    indication: 'Intracranial hypertension / herniation; symptomatic hyponatremia',
+    route: 'IV over 10–20 min',
+    unit: 'mL',
+    perKg: 2,
+    perKgHigh: 5,
+    max: 250,
+    notes: 'Preferred over mannitol in pediatric TBI. Infusion 0.1–1 mL/kg/h titrated to ICP <20. Avoid sustained Na >160.',
+    refs: ['btf-2019'],
+  },
+  {
+    id: 'hts23',
+    name: '23.4% saline',
+    category: 'icp',
+    indication: 'Refractory intracranial hypertension',
+    route: 'Central line only',
+    unit: 'mL',
+    perKg: 0.5,
+    max: 30,
+    refs: ['btf-2019'],
+  },
+  {
+    id: 'mannitol',
+    name: 'Mannitol 20%',
+    category: 'icp',
+    indication: 'Intracranial hypertension; DKA cerebral injury',
+    route: 'IV over 10–20 min',
+    unit: 'g',
+    perKg: 0.5,
+    perKgHigh: 1,
+    max: 100,
+    concentration: { perMl: 0.2, label: '0.2 g/mL' },
+    notes: 'Osmotic diuresis → hypovolemia; replace urine losses. Keep serum osm <320.',
+    refs: ['btf-2019', 'ispad-2022'],
+  },
+  // ---- Airway
+  {
+    id: 'epi-im',
+    name: 'Epinephrine IM (anaphylaxis)',
+    category: 'airway',
+    indication: 'Anaphylaxis',
+    route: 'IM (anterolateral thigh)',
+    unit: 'mg',
+    perKg: 0.01,
+    max: 0.5,
+    concentration: { perMl: 1, label: '1 mg/mL' },
+    notes: 'Repeat every 5–15 min. If ≥2–3 doses needed, start an epinephrine infusion (0.05–0.3 mcg/kg/min) and give fluid.',
+    refs: [],
+  },
+  {
+    id: 'epi-neb',
+    name: 'Nebulized epinephrine (L-, 1 mg/mL)',
+    category: 'airway',
+    indication: 'Moderate–severe croup, post-extubation stridor',
+    route: 'Nebulized',
+    unit: 'mL',
+    perKg: 0.5,
+    max: 5,
+    notes: 'Effect lasts ~2 h – observe for rebound. Racemic 2.25%: 0.05 mL/kg (max 0.5 mL).',
+    refs: [],
+  },
+  {
+    id: 'dex-croup',
+    name: 'Dexamethasone (croup)',
+    category: 'airway',
+    indication: 'Croup (any severity)',
+    route: 'PO/IV/IM',
+    unit: 'mg',
+    perKg: 0.15,
+    perKgHigh: 0.6,
+    max: 16,
+    concentration: { perMl: 4, label: '4 mg/mL' },
+    notes: '0.15 mg/kg is as effective as 0.6 mg/kg for mild–moderate croup.',
+    refs: [],
+  },
+  {
+    id: 'dex-extub',
+    name: 'Dexamethasone (pre-extubation)',
+    category: 'airway',
+    indication: 'High risk of post-extubation stridor',
+    route: 'IV q6h ×4–6 doses',
+    unit: 'mg',
+    perKg: 0.5,
+    max: 10,
+    concentration: { perMl: 4, label: '4 mg/mL' },
+    notes: 'Start 6–24 h before planned extubation.',
+    refs: [],
+  },
+  {
+    id: 'salbutamol',
+    name: 'Salbutamol (albuterol) neb',
+    category: 'airway',
+    indication: 'Bronchospasm; hyperkalemia (adjunct)',
+    route: 'Nebulized',
+    unit: 'mg',
+    bands: [
+      { maxKg: 20, dose: 2.5 },
+      { maxKg: Infinity, dose: 5 },
+    ],
+    notes: 'Severe asthma: back-to-back ×3, then continuous 0.5 mg/kg/h (max 20 mg/h). Monitor K⁺, lactate (β2 effect).',
+    refs: [],
+  },
+  {
+    id: 'ipratropium',
+    name: 'Ipratropium neb',
+    category: 'airway',
+    indication: 'Moderate–severe asthma (first hour)',
+    route: 'Nebulized q20 min ×3',
+    unit: 'mcg',
+    bands: [
+      { maxKg: 20, dose: 250 },
+      { maxKg: Infinity, dose: 500 },
+    ],
+    refs: [],
+  },
+  {
+    id: 'mg-asthma',
+    name: 'Magnesium sulfate',
+    category: 'airway',
+    indication: 'Severe asthma not responding to first-line therapy',
+    route: 'IV over 20 min',
+    unit: 'mg',
+    perKg: 50,
+    max: 2000,
+    notes: 'Range 25–75 mg/kg. Hypotension and flushing if given fast.',
+    refs: [],
+  },
+  {
+    id: 'methylpred',
+    name: 'Methylprednisolone',
+    category: 'airway',
+    indication: 'Status asthmaticus',
+    route: 'IV q12h',
+    unit: 'mg',
+    perKg: 1,
+    max: 30,
+    notes: '1–2 mg/kg/day (max 60 mg/day). Alternative: dexamethasone 0.6 mg/kg (max 16 mg).',
+    refs: [],
+  },
+  {
+    id: 'terbutaline-sc',
+    name: 'Terbutaline SC',
+    category: 'airway',
+    indication: 'Severe asthma when nebulization is ineffective',
+    route: 'SC',
+    unit: 'mg',
+    perKg: 0.01,
+    max: 0.4,
+    concentration: { perMl: 1, label: '1 mg/mL' },
+    refs: [],
+  },
+  // ---- Metabolic
+  {
+    id: 'insulin-k',
+    name: 'Regular insulin (hyperkalemia)',
+    category: 'metabolic',
+    indication: 'Hyperkalemia – shifts K⁺ into cells',
+    route: 'IV',
+    unit: 'units',
+    perKg: 0.1,
+    max: 10,
+    notes: 'Always with dextrose 0.5 g/kg (D10 5 mL/kg, max 25 g); check glucose every 30–60 min for 4–6 h.',
+    refs: [],
+  },
+  {
+    id: 'salbutamol-k',
+    name: 'Salbutamol neb (hyperkalemia)',
+    category: 'metabolic',
+    indication: 'Hyperkalemia – shifts K⁺ into cells',
+    route: 'Nebulized',
+    unit: 'mg',
+    bands: [
+      { maxKg: 25, dose: 2.5 },
+      { maxKg: Infinity, dose: 5 },
+    ],
+    refs: [],
+  },
+  {
+    id: 'furosemide',
+    name: 'Furosemide',
+    category: 'metabolic',
+    indication: 'Fluid overload; hyperkalemia with urine output',
+    route: 'IV',
+    unit: 'mg',
+    perKg: 1,
+    max: 40,
+    concentration: { perMl: 10, label: '10 mg/mL' },
+    refs: [],
+  },
+  {
+    id: 'hts3-na',
+    name: '3% saline (symptomatic hyponatremia)',
+    category: 'metabolic',
+    indication: 'Seizure / coma from hyponatremia',
+    route: 'IV over 10 min',
+    unit: 'mL',
+    perKg: 2,
+    max: 100,
+    notes: '1 mL/kg raises Na by ~1 mmol/L. Repeat up to 2× until symptoms stop; limit total rise to ≤8–10 mmol/L/24 h.',
+    refs: [],
+  },
+  {
+    id: 'kcl',
+    name: 'Potassium chloride IV',
+    category: 'metabolic',
+    indication: 'Symptomatic / severe hypokalemia',
+    route: 'IV over 1–2 h (central for >40 mEq/L)',
+    unit: 'mEq',
+    perKg: 0.5,
+    perKgHigh: 1,
+    max: 40,
+    notes: 'Maximum 0.5 mEq/kg/h with continuous ECG monitoring.',
+    refs: [],
+  },
+  {
+    id: 'mg-repl',
+    name: 'Magnesium sulfate (replacement)',
+    category: 'metabolic',
+    indication: 'Hypomagnesemia, torsades',
+    route: 'IV over 20–60 min (torsades: 10–20 min)',
+    unit: 'mg',
+    perKg: 25,
+    perKgHigh: 50,
+    max: 2000,
+    refs: [],
+  },
+  {
+    id: 'phos',
+    name: 'Sodium/potassium phosphate',
+    category: 'metabolic',
+    indication: 'Hypophosphatemia (refeeding, DKA)',
+    route: 'IV over 4–6 h',
+    unit: 'mmol',
+    perKg: 0.08,
+    perKgHigh: 0.24,
+    max: 15,
+    refs: [],
+  },
+  {
+    id: 'hydrocortisone',
+    name: 'Hydrocortisone (stress dose)',
+    category: 'metabolic',
+    indication: 'Adrenal crisis; known/suspected adrenal insufficiency in shock',
+    route: 'IV/IM',
+    unit: 'mg',
+    perKg: 2,
+    perKgHigh: 4,
+    max: 100,
+    notes: '≈50–100 mg/m². Then 50 mg/m²/day or 1–2 mg/kg/day divided (SSC 2026). Not routine in septic shock that responds to fluid and vasoactives.',
+    refs: ['ssc-peds-2026'],
+  },
+  {
+    id: 'dka-bolus',
+    name: 'DKA initial fluid',
+    category: 'metabolic',
+    indication: 'DKA with poor perfusion',
+    route: 'IV over 20–30 min',
+    unit: 'mL',
+    perKg: 10,
+    perKgHigh: 20,
+    max: 1000,
+    notes: 'Then deficit (5–10%) + maintenance evenly over 24–48 h. Shock: 20 mL/kg rapidly, repeat as needed.',
+    refs: ['ispad-2022', 'pecarn-fluid-2018'],
+  },
+  // ---- Antimicrobials
+  {
+    id: 'ceftriaxone',
+    name: 'Ceftriaxone',
+    category: 'antimicrobial',
+    indication: 'Community-acquired sepsis / meningitis (>1 month)',
+    route: 'IV',
+    unit: 'mg',
+    perKg: 50,
+    perKgHigh: 100,
+    max: 2000,
+    notes: 'Meningitis 50 mg/kg q12h (max 4 g/day). Avoid in neonates (use cefotaxime/ceftazidime).',
+    refs: ['ssc-peds-2026'],
+  },
+  {
+    id: 'cefotaxime',
+    name: 'Cefotaxime',
+    category: 'antimicrobial',
+    indication: 'Neonatal sepsis/meningitis',
+    route: 'IV',
+    unit: 'mg',
+    perKg: 50,
+    max: 2000,
+    notes: 'With ampicillin ± aciclovir in neonates.',
+    refs: ['ssc-peds-2026'],
+  },
+  {
+    id: 'ampicillin',
+    name: 'Ampicillin',
+    category: 'antimicrobial',
+    indication: 'Neonatal sepsis (GBS, Listeria, enterococcus)',
+    route: 'IV',
+    unit: 'mg',
+    perKg: 50,
+    perKgHigh: 100,
+    max: 2000,
+    notes: 'Meningitis dosing is higher and interval age-dependent.',
+    refs: [],
+  },
+  {
+    id: 'vancomycin',
+    name: 'Vancomycin',
+    category: 'antimicrobial',
+    indication: 'Suspected MRSA, line infection, pneumococcal meningitis',
+    route: 'IV over 60 min',
+    unit: 'mg',
+    perKg: 15,
+    perKgHigh: 20,
+    max: 2000,
+    notes: 'AUC-guided dosing (target AUC 400–600). Nephrotoxic with pip-tazo.',
+    refs: [],
+  },
+  {
+    id: 'piptazo',
+    name: 'Piperacillin–tazobactam',
+    category: 'antimicrobial',
+    indication: 'Hospital-acquired sepsis, neutropenic fever, intra-abdominal',
+    route: 'IV',
+    unit: 'mg',
+    perKg: 100,
+    max: 4000,
+    notes: 'Dose by piperacillin component q6–8h.',
+    refs: [],
+  },
+  {
+    id: 'meropenem',
+    name: 'Meropenem',
+    category: 'antimicrobial',
+    indication: 'Resistant Gram-negative risk, neutropenic sepsis',
+    route: 'IV',
+    unit: 'mg',
+    perKg: 20,
+    perKgHigh: 40,
+    max: 2000,
+    notes: '40 mg/kg for meningitis. q8h.',
+    refs: [],
+  },
+  {
+    id: 'clindamycin',
+    name: 'Clindamycin',
+    category: 'antimicrobial',
+    indication: 'Toxin suppression – toxic shock, necrotizing fasciitis',
+    route: 'IV',
+    unit: 'mg',
+    perKg: 10,
+    perKgHigh: 13,
+    max: 900,
+    refs: [],
+  },
+  {
+    id: 'aciclovir',
+    name: 'Aciclovir',
+    category: 'antimicrobial',
+    indication: 'Suspected HSV (neonates, encephalitis)',
+    route: 'IV q8h',
+    unit: 'mg',
+    perKg: 20,
+    max: 1000,
+    notes: 'Neonates 20 mg/kg q8h. Older children with encephalitis 10–15 mg/kg q8h. Hydrate (crystal nephropathy).',
+    refs: [],
+  },
+  // ---- Blood
+  {
+    id: 'prbc',
+    name: 'Packed red cells',
+    category: 'blood',
+    indication: 'Anemia with hemorrhage or Hb <7 g/dL',
+    route: 'IV',
+    unit: 'mL',
+    perKg: 10,
+    perKgHigh: 15,
+    notes: '10–15 mL/kg raises Hb ≈2–3 g/dL. Stable PICU patients: do not transfuse at Hb ≥7 (TAXI, PALICC-2).',
+    refs: ['taxi-2018', 'palicc2-2023'],
+  },
+  {
+    id: 'platelets',
+    name: 'Platelets',
+    category: 'blood',
+    indication: 'Bleeding or procedure with thrombocytopenia',
+    route: 'IV',
+    unit: 'mL',
+    perKg: 5,
+    perKgHigh: 10,
+    notes: '10 mL/kg raises count by ~50×10⁹/L. Non-bleeding hypoproliferative: threshold 10×10⁹/L.',
+    refs: ['taxicab-2022'],
+  },
+  {
+    id: 'ffp',
+    name: 'Plasma',
+    category: 'blood',
+    indication: 'Bleeding with coagulopathy; massive transfusion',
+    route: 'IV',
+    unit: 'mL',
+    perKg: 10,
+    perKgHigh: 15,
+    notes: 'Prophylactic plasma for abnormal INR alone is not recommended.',
+    refs: ['taxicab-2022'],
+  },
+  {
+    id: 'cryo',
+    name: 'Cryoprecipitate',
+    category: 'blood',
+    indication: 'Fibrinogen <1.5 g/L with bleeding',
+    route: 'IV',
+    unit: 'mL',
+    perKg: 5,
+    perKgHigh: 10,
+    refs: [],
+  },
+  {
+    id: 'txa',
+    name: 'Tranexamic acid',
+    category: 'blood',
+    indication: 'Major trauma hemorrhage within 3 h; surgical bleeding',
+    route: 'IV over 10 min',
+    unit: 'mg',
+    perKg: 15,
+    max: 1000,
+    notes: 'Then 2 mg/kg/h for 8 h.',
+    refs: [],
+  },
+];
+
+export interface DoseResult {
+  dose: number;
+  doseHigh: number | null;
+  capped: boolean;
+  volumeMl: number | null;
+  volumeHighMl: number | null;
+}
+
+export function calcDose(d: DrugSpec, weightKg: number): DoseResult {
+  let dose: number;
+  let doseHigh: number | null = null;
+  if (d.bands) {
+    dose = d.bands.find((b) => weightKg < b.maxKg)?.dose ?? d.bands[d.bands.length - 1].dose;
+  } else {
+    dose = (d.perKg ?? 0) * weightKg;
+    if (d.perKgHigh) doseHigh = d.perKgHigh * weightKg;
+  }
+  let capped = false;
+  if (d.max !== undefined) {
+    if (dose > d.max) {
+      dose = d.max;
+      capped = true;
+    }
+    if (doseHigh !== null && doseHigh > d.max) {
+      doseHigh = d.max;
+      capped = true;
+    }
+  }
+  if (doseHigh !== null && Math.abs(doseHigh - dose) < 1e-9) doseHigh = null;
+  const decimals = dose < 1 ? 3 : dose < 10 ? 2 : 1;
+  const volumeMl = d.concentration ? round(dose / d.concentration.perMl, 2) : null;
+  const volumeHighMl = d.concentration && doseHigh !== null ? round(doseHigh / d.concentration.perMl, 2) : null;
+  return { dose: round(dose, decimals), doseHigh: doseHigh === null ? null : round(doseHigh, decimals), capped, volumeMl, volumeHighMl };
+}
+
+// ---------------------------------------------------------------------------
+// Continuous infusions
+// ---------------------------------------------------------------------------
+
+export type RateUnit = 'mcg/kg/min' | 'mcg/kg/h' | 'mg/kg/h' | 'units/kg/h' | 'milliunits/kg/min' | 'mL/kg/h';
+
+export interface InfusionSpec {
+  id: string;
+  name: string;
+  group: 'Vasoactive' | 'Sedation & analgesia' | 'Neuromuscular blockade' | 'Respiratory' | 'Metabolic' | 'Neuro' | 'Cardiac';
+  rateUnit: RateUnit;
+  range: [number, number];
+  /** default bag: amount in drugUnit per volume mL */
+  bag: { amount: number; drugUnit: 'mg' | 'mcg' | 'units' | 'mL'; volumeMl: number };
+  notes: string;
+  refs: string[];
+}
+
+export const INFUSIONS: InfusionSpec[] = [
+  { id: 'epi', name: 'Epinephrine', group: 'Vasoactive', rateUnit: 'mcg/kg/min', range: [0.02, 0.3], bag: { amount: 1, drugUnit: 'mg', volumeMl: 50 }, notes: 'First-line for cold (low-output) septic shock in most PICUs; peripheral start acceptable (SSC 2026). Raises lactate.', refs: ['ssc-peds-2026'] },
+  { id: 'ne', name: 'Norepinephrine', group: 'Vasoactive', rateUnit: 'mcg/kg/min', range: [0.02, 0.3], bag: { amount: 1, drugUnit: 'mg', volumeMl: 50 }, notes: 'Vasoplegic (warm) shock. SSC 2026: no preference epinephrine vs norepinephrine as first line.', refs: ['ssc-peds-2026'] },
+  { id: 'vaso', name: 'Vasopressin', group: 'Vasoactive', rateUnit: 'milliunits/kg/min', range: [0.3, 2], bag: { amount: 20, drugUnit: 'units', volumeMl: 100 }, notes: 'Add-on when catecholamine dose is high (SSC 2026: add vasopressin or titrate catecholamines).', refs: ['ssc-peds-2026'] },
+  { id: 'dopa', name: 'Dopamine', group: 'Vasoactive', rateUnit: 'mcg/kg/min', range: [5, 10], bag: { amount: 200, drugUnit: 'mg', volumeMl: 50 }, notes: 'Use only when epinephrine/norepinephrine unavailable; arrhythmogenic, endocrine effects.', refs: [] },
+  { id: 'dobu', name: 'Dobutamine', group: 'Vasoactive', rateUnit: 'mcg/kg/min', range: [2.5, 15], bag: { amount: 250, drugUnit: 'mg', volumeMl: 50 }, notes: 'Inotrope with vasodilation; tachycardia.', refs: [] },
+  { id: 'milrinone', name: 'Milrinone', group: 'Cardiac', rateUnit: 'mcg/kg/min', range: [0.25, 0.75], bag: { amount: 10, drugUnit: 'mg', volumeMl: 50 }, notes: 'Inodilator; low-cardiac-output syndrome after bypass (PRIMACORP). Skip the load if hypotensive; reduce in AKI.', refs: [] },
+  { id: 'pge1', name: 'Alprostadil (PGE1)', group: 'Cardiac', rateUnit: 'mcg/kg/min', range: [0.01, 0.1], bag: { amount: 500, drugUnit: 'mcg', volumeMl: 100 }, notes: 'Duct-dependent lesion: start 0.05–0.1 if duct closing, then lowest effective dose. Apnea, fever, hypotension.', refs: [] },
+  { id: 'nicardipine', name: 'Nicardipine', group: 'Cardiac', rateUnit: 'mcg/kg/min', range: [0.5, 3], bag: { amount: 10, drugUnit: 'mg', volumeMl: 100 }, notes: 'Hypertensive emergency: lower MAP ≤25% over first 8 h.', refs: [] },
+  { id: 'fentanyl', name: 'Fentanyl', group: 'Sedation & analgesia', rateUnit: 'mcg/kg/h', range: [0.5, 3], bag: { amount: 500, drugUnit: 'mcg', volumeMl: 50 }, notes: 'Tolerance in days; wean 10–20%/day after ≥5 days (WAT-1 monitoring).', refs: ['pandem-2022'] },
+  { id: 'morphine', name: 'Morphine', group: 'Sedation & analgesia', rateUnit: 'mcg/kg/h', range: [10, 40], bag: { amount: 10, drugUnit: 'mg', volumeMl: 50 }, notes: 'Histamine release; accumulates in renal failure (M6G).', refs: ['pandem-2022'] },
+  { id: 'dexmed', name: 'Dexmedetomidine', group: 'Sedation & analgesia', rateUnit: 'mcg/kg/h', range: [0.2, 1.5], bag: { amount: 200, drugUnit: 'mcg', volumeMl: 50 }, notes: 'Opioid/benzo-sparing; bradycardia, hypotension; avoid loading bolus in unstable patients.', refs: ['pandem-2022'] },
+  { id: 'midazolam', name: 'Midazolam', group: 'Sedation & analgesia', rateUnit: 'mg/kg/h', range: [0.05, 0.2], bag: { amount: 50, drugUnit: 'mg', volumeMl: 50 }, notes: 'Delirium risk – minimize benzodiazepines (PANDEM). Refractory SE: titrate up to 2 mg/kg/h with cEEG.', refs: ['pandem-2022'] },
+  { id: 'ketamine', name: 'Ketamine', group: 'Sedation & analgesia', rateUnit: 'mg/kg/h', range: [0.5, 2], bag: { amount: 500, drugUnit: 'mg', volumeMl: 50 }, notes: 'Bronchodilator; preserves BP; adjunct in refractory SE and severe asthma.', refs: [] },
+  { id: 'propofol', name: 'Propofol', group: 'Sedation & analgesia', rateUnit: 'mg/kg/h', range: [1, 4], bag: { amount: 500, drugUnit: 'mg', volumeMl: 50 }, notes: 'Avoid >4 mg/kg/h or >48 h in children (propofol infusion syndrome: acidosis, rhabdomyolysis, arrhythmia).', refs: [] },
+  { id: 'roc', name: 'Rocuronium', group: 'Neuromuscular blockade', rateUnit: 'mg/kg/h', range: [0.3, 1.2], bag: { amount: 500, drugUnit: 'mg', volumeMl: 50 }, notes: 'Use only with adequate sedation; titrate to train-of-four 1–2/4.', refs: ['palicc2-2023'] },
+  { id: 'cisatracurium', name: 'Cisatracurium', group: 'Neuromuscular blockade', rateUnit: 'mcg/kg/min', range: [1, 4], bag: { amount: 100, drugUnit: 'mg', volumeMl: 50 }, notes: 'Organ-independent (Hofmann) elimination – useful in hepatic/renal failure.', refs: [] },
+  { id: 'insulin-dka', name: 'Insulin (DKA)', group: 'Metabolic', rateUnit: 'units/kg/h', range: [0.05, 0.1], bag: { amount: 50, drugUnit: 'units', volumeMl: 50 }, notes: 'Start ≥1 h after fluids begin; no bolus. Do not stop for falling glucose – add dextrose.', refs: ['ispad-2022'] },
+  { id: 'salbutamol-cont', name: 'Salbutamol continuous neb', group: 'Respiratory', rateUnit: 'mg/kg/h' as RateUnit, range: [0.15, 0.5], bag: { amount: 5, drugUnit: 'mg', volumeMl: 1 }, notes: 'Max ~20 mg/h. Tachycardia, hypokalemia, lactic acidosis, V/Q worsening.', refs: [] },
+  { id: 'terbutaline', name: 'Terbutaline IV', group: 'Respiratory', rateUnit: 'mcg/kg/min', range: [0.1, 4], bag: { amount: 1, drugUnit: 'mg', volumeMl: 50 }, notes: 'Load 10 mcg/kg over 10 min. Tachyarrhythmia, myocardial ischemia (check troponin).', refs: [] },
+  { id: 'hts3-inf', name: '3% saline (ICP)', group: 'Neuro', rateUnit: 'mL/kg/h', range: [0.1, 1], bag: { amount: 1, drugUnit: 'mL', volumeMl: 1 }, notes: 'Titrate to ICP <20; target Na typically 145–160; avoid sustained >160 (BTF).', refs: ['btf-2019'] },
+];
+
+const UNIT_TO_MCG = { mg: 1000, mcg: 1, units: 1, mL: 1 } as const;
+
+/** Convert a weight-based dose to mL/h for a given bag. */
+export function infusionRateMlH(spec: InfusionSpec, dose: number, weightKg: number, bag = spec.bag): number {
+  const concPerMl = bag.amount / bag.volumeMl; // drugUnit per mL
+  switch (spec.rateUnit) {
+    case 'mcg/kg/min': {
+      const mcgPerH = dose * weightKg * 60;
+      return mcgPerH / (concPerMl * UNIT_TO_MCG[bag.drugUnit]);
+    }
+    case 'mcg/kg/h':
+      return (dose * weightKg) / (concPerMl * UNIT_TO_MCG[bag.drugUnit]);
+    case 'mg/kg/h':
+      return (dose * weightKg * 1000) / (concPerMl * UNIT_TO_MCG[bag.drugUnit]);
+    case 'units/kg/h':
+      return (dose * weightKg) / concPerMl;
+    case 'milliunits/kg/min':
+      return (dose * weightKg * 60) / 1000 / concPerMl;
+    case 'mL/kg/h':
+      return dose * weightKg;
+  }
+}
+
+/** Inverse: mL/h → weight-based dose. */
+export function infusionDose(spec: InfusionSpec, rateMlH: number, weightKg: number, bag = spec.bag): number {
+  const per1 = infusionRateMlH(spec, 1, weightKg, bag);
+  return per1 === 0 ? 0 : rateMlH / per1;
+}
