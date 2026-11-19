@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Clock, Droplet, Droplets, RotateCcw, Scissors, Wind } from 'lucide-react';
+import { Clock, Droplet, Droplets, HeartPulse, Pill, RotateCcw, Scissors, Wind, Zap } from 'lucide-react';
 import {
   computeHemodynamics,
   decompress,
+  giveHydrocortisone,
   DRUG_META,
   giveFluid,
   guytonCurves,
   intubate,
+  treatRhythm,
   makeBaseline,
   NO_DRUGS,
   passTime,
@@ -24,10 +26,15 @@ import { GuytonChart } from '@/components/charts';
 
 const AGE_PRESETS = [
   { value: '0.5', label: 'Neonate (2 wk)' },
+  { value: '0.75', label: 'Neonate (3 wk)' },
+  { value: '1.5', label: 'Infant (6 wk)' },
+  { value: '4', label: 'Infant (4 mo)' },
   { value: '8', label: 'Infant (8 mo)' },
   { value: '14', label: 'Toddler (14 mo)' },
   { value: '48', label: 'Preschool (4 y)' },
+  { value: '60', label: 'Child (5 y)' },
   { value: '72', label: 'Child (6 y)' },
+  { value: '84', label: 'Child (7 y)' },
   { value: '96', label: 'Child (8 y)' },
   { value: '120', label: 'Child (10 y)' },
   { value: '168', label: 'Adolescent (14 y)' },
@@ -130,6 +137,10 @@ export default function ShockLab() {
   if (out.scvo2 < 70) insights.push({ tone: 'warn', text: `ScvO₂ ${round(out.scvo2)}% (<70%): oxygen delivery is not meeting demand.` });
   if (state.drugs.epinephrine >= 0.1) insights.push({ tone: 'info', text: 'Epinephrine raises lactate via β2 (type B) – judge perfusion by CRT, mental status, urine output and ScvO₂ too.' });
   if (state.pext > 0) insights.push({ tone: 'danger', text: 'Extrinsic compression of the heart: fluid only buys time – decompress.' });
+  if (state.fixedHr && state.fixedHr > b.hr0) insights.push({ tone: 'danger', text: `Rate fixed at ${state.fixedHr}/min by the arrhythmia: diastolic filling time is too short, and chronotropes and fluid cannot fix it – terminate the rhythm.` });
+  if (state.fixedHr && state.fixedHr < b.hr0) insights.push({ tone: 'danger', text: `Ventricular rate fixed at ${state.fixedHr}/min (heart block): output is rate-limited; pacing restores it.` });
+  if ((state.drugGain ?? 1) < 1) insights.push({ tone: 'warn', text: 'Catecholamine response is blunted (glucocorticoid deficiency) – vasoactives barely move the BP until hydrocortisone is given.' });
+  if ((state.reflexGain ?? 1) < 0.5) insights.push({ tone: 'info', text: 'Baroreflex interrupted (high spinal cord injury): no compensatory tachycardia or vasoconstriction – hypotension with a normal or slow heart rate.' });
   if (out.sipaPositive) insights.push({ tone: 'warn', text: `Shock index ${fmt(out.shockIndex, 2)} exceeds the age-adjusted SIPA cut-off (${out.sipaThreshold}).` });
   if (insights.length === 0) insights.push({ tone: 'ok', text: 'Perfusion adequate for age.' });
 
@@ -215,6 +226,21 @@ export default function ShockLab() {
               {state.pext > 0 && (
                 <Button variant="danger" className="w-full" onClick={() => apply('Decompression (pericardiocentesis / needle)', 'procedure', decompress(state))}>
                   <Scissors className="h-4 w-4" /> Decompress
+                </Button>
+              )}
+              {state.fixedHr && state.fixedHr > b.hr0 && (
+                <Button variant="danger" className="w-full" onClick={() => apply('Synchronized cardioversion → sinus rhythm', 'procedure', treatRhythm(b, state))}>
+                  <Zap className="h-4 w-4" /> Synchronized cardioversion
+                </Button>
+              )}
+              {state.fixedHr && state.fixedHr < b.hr0 && (
+                <Button variant="danger" className="w-full" onClick={() => apply(`Pacing at ${b.hr0}/min`, 'procedure', treatRhythm(b, state))}>
+                  <HeartPulse className="h-4 w-4" /> Pace at {b.hr0}/min
+                </Button>
+              )}
+              {(state.drugGain ?? 1) < 1 && !state.steroidGiven && (
+                <Button variant="outline" className="w-full" onClick={() => apply('Hydrocortisone (stress dose)', 'drug', giveHydrocortisone(state))}>
+                  <Pill className="h-4 w-4" /> Hydrocortisone stress dose
                 </Button>
               )}
               <Button variant="ghost" size="sm" onClick={() => reset()}>
