@@ -1,9 +1,11 @@
 import type { Question } from './types';
+import { EXTRA_QUESTIONS } from './questions-extra';
+import { balanceQuestion } from './balance';
 
 type Q = Omit<Question, 'module'>;
 const mod = (module: string, qs: Q[]): Question[] => qs.map((q) => ({ ...q, module }));
 
-export const QUESTIONS: Question[] = [
+const CORE_QUESTIONS: Question[] = [
   ...mod('foundations', [
     {
       id: 'f1',
@@ -1180,3 +1182,5 @@ export const QUESTIONS: Question[] = [
     },
   ]),
 ];
+
+export const QUESTIONS: Question[] = [...CORE_QUESTIONS, ...EXTRA_QUESTIONS].map(balanceQuestion);

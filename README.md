@@ -1,6 +1,6 @@
 # PICU Matrix
 
-Interactive pediatric critical care curriculum: 13 modules, 4 physiology simulators, 8 bedside calculators, 9 branching PICU cases, 17 blood-gas drills and a 121-question bank with spaced review. Mobile-first, works offline (PWA), progress saved on the device.
+Interactive pediatric critical care curriculum: 13 modules, 4 physiology simulators, 8 bedside calculators, 24 branching PICU cases, 17 blood-gas drills and a 220-question bank with spaced review. Mobile-first, works offline (PWA), progress saved on the device.
 
 Evidence base (newest first): SSC Children 2026 · PRoMPT BOLUS 2026 · AHA/AAP PALS 2025 · Oxy-PICU 2024 · Phoenix Sepsis Criteria 2024 · PALICC-2 2023 · SCCM PANDEM 2022 · TAXI-CAB 2022 · ISPAD DKA 2022 · BTF pediatric TBI 2019 · ESETT/ConSEPT/EcLiPSE 2019 · AAP maintenance fluids 2018 · KDIGO 2012 (2026 update in review). Full list in-app under **Sources & settings** and in `src/content/references.ts`.
 
@@ -14,14 +14,14 @@ Evidence base (newest first): SSC Children 2026 · PRoMPT BOLUS 2026 · AHA/AAP 
 | **Acid–Base Lab** | Six-step analyzer (consistency, compensation, albumin-corrected AG, delta ratio, osmolal gap, urine AG, Stewart SID/SIG) + 17 pediatric drills. |
 | **Fluids Lab** | Holliday–Segar, GIR, Adrogué–Madias sodium prediction with safe-rate checks, hyper/hyponatremia plans, fluid overload %, corrected Ca. |
 | **Tools** | Resuscitation card (65 weight-based drugs with caps, equipment, age norms) · 20-drug infusion calculator · Phoenix score · OI/OSI/PARDS · AKI/eGFR/FO%/RAI/CRRT · GCS/CPP/TBI targets · Qp:Qs/DO₂ · DKA planner. |
-| **Practice** | 9 time-stepped cases with age-flagged monitors and debriefs; 121 questions (module filters, missed/due modes, Leitner spaced review). |
+| **Practice** | 24 time-stepped cases covering every module (septic, hemorrhagic, anaphylactic and cardiogenic shock; VF arrest, infant SVT and hypoxic bradycardia; PARDS, asthma, bronchiolitis, croup; TBI, status epilepticus, meningitis; DKA, hyperammonemia; HUS, tumor lysis; duct-dependent neonate, post-op LCOS/JET; salicylate poisoning; post-op hyponatremia; withdrawal/delirium; refeeding) with age-flagged monitors and debriefs; 220 questions (module filters, missed/due modes, Leitner spaced review, balanced answer positions). |
 
 ## Develop
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 98 engine, stress and content-integrity tests
+npm test           # 116 engine, stress and content-integrity tests
 npm run lint
 npm run build      # type-check + production build to dist/
 ```
@@ -45,7 +45,7 @@ src/
 - **Engine tests**: known values (PALS thresholds, APLS weights, ETT sizes, Phoenix cut-offs, ODC landmarks, Winter's, KDIGO, Schwartz/CKiD U25, Adrogué–Madias, GIR, infusion math).
 - **Physiology behavior tests**: hypovolemia is fluid-responsive, cardiogenic shock is not; epinephrine raises flow in cold shock while norepinephrine raises pressure; decompression fixes tamponade; propofol drops MAP more than ketamine; PEEP recruits recruitable but not consolidated lung; FiO₂ fails to correct true shunt; rate increases auto-PEEP in asthma.
 - **Stress tests**: thousands of random ages/settings/drug combinations through the ventilator, circulation and acid–base engines must stay finite and physiologic; every drug at every weight 0.5–150 kg must respect its maximum dose.
-- **Content integrity**: every question has a valid key and rationale, every case stage has exactly one correct option, every citation/route/prerequisite resolves, and all 17 drills match the analyzer.
+- **Content integrity**: every question has a valid key and rationale, every case stage has exactly one correct option, every citation/route/prerequisite resolves, all 17 drills match the analyzer, and correct-answer positions stay balanced (no position >40%).
 
 ## Deploy
 

@@ -111,7 +111,8 @@ export default function CasePlayer() {
           <span className="font-semibold uppercase tracking-wider">Monitor · {stage.time}</span>
           {stage.support && <span>{stage.support}</span>}
         </div>
-        <div className="grid grid-cols-3 gap-2 bg-monitor p-3 pt-0 sm:grid-cols-4 lg:grid-cols-7">
+        {Object.keys(v).length === 0 && <p className="bg-monitor px-4 pb-3 text-sm font-semibold text-rose-400">No pulse – vital signs unavailable</p>}
+        <div className={cn('grid grid-cols-3 gap-2 bg-monitor p-3 pt-0 sm:grid-cols-4 lg:grid-cols-7', Object.keys(v).length === 0 && 'hidden')}>
           {v.hr !== undefined && <Stat label="HR" value={v.hr} unit="/min" tone={tones.hr} color="text-emerald-400" />}
           {v.sbp !== undefined && <Stat label="BP" value={`${v.sbp}/${v.dbp ?? '–'}`} tone={tones.sbp} color="text-rose-400" sub={v.dbp !== undefined ? `MAP ${Math.round(v.dbp + (v.sbp - v.dbp) / 3)}` : undefined} />}
           {v.rr !== undefined && <Stat label="RR" value={v.rr} unit="/min" tone={tones.rr} color="text-amber-300" />}
